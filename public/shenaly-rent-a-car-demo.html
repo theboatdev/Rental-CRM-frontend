@@ -1,0 +1,3197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shenaly Rent a Car - Management System Demo</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0f7ff',
+              100: '#e0effe',
+              500: '#0284c7',
+              600: '#0369a1',
+              700: '#075985',
+              800: '#0c4a6e',
+              900: '#082f49',
+            },
+            amber: {
+              500: '#f59e0b',
+              600: '#d97706',
+              700: '#b45309'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    body { font-family: 'Inter', sans-serif; }
+    .badge { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900 antialiased min-h-screen flex flex-col">
+
+  <!-- Top App Navigation / Auth Header -->
+  <header class="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-amber-600 flex items-center justify-center font-bold text-slate-950 text-xl shadow-md">
+          S
+        </div>
+        <div>
+          <div class="font-bold text-lg tracking-tight leading-tight flex items-center space-x-2">
+            <span>Shenaly Rent a Car</span>
+            <span class="text-xs bg-amber-500/20 text-amber-400 border border-amber-500/40 px-2 py-0.5 rounded uppercase font-semibold">Demo</span>
+          </div>
+          <p class="text-xs text-slate-400">Operations & Fleet Portal · Colombo, Sri Lanka</p>
+        </div>
+      </div>
+
+      <!-- Dummy Authentication Switcher & Guest Front Link -->
+      <div class="flex items-center space-x-3">
+        <button onclick="openPublicPortal()" class="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-semibold px-3 py-1.5 rounded-lg text-xs flex items-center space-x-1.5 shadow-sm transition-all border border-emerald-400/40" title="Open user front link where customers register themselves and book early with no app needed">
+          <span>🌐 Guest Registration Link</span>
+          <span class="bg-white/20 text-white text-[10px] px-1.5 py-0.5 rounded font-mono">No App</span>
+        </button>
+        <div class="hidden sm:flex items-center bg-slate-800 rounded-lg p-1 border border-slate-700 text-xs">
+          <span class="text-slate-400 px-2 font-medium">Demo Auth:</span>
+          <button id="btnSwitchAdmin" onclick="switchUserRole('ADMIN')" class="px-2.5 py-1 rounded font-medium transition-colors bg-amber-500 text-slate-950 font-semibold shadow-sm">
+            Admin (Dinuka)
+          </button>
+          <button id="btnSwitchStaff" onclick="switchUserRole('STAFF')" class="px-2.5 py-1 rounded font-medium transition-colors text-slate-300 hover:text-white">
+            Staff (Kasun)
+          </button>
+        </div>
+        <div class="flex items-center space-x-2 border-l border-slate-800 pl-3">
+          <div id="userAvatar" class="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs font-semibold text-amber-400 border border-slate-600">
+            DS
+          </div>
+          <div class="hidden md:block text-left text-xs">
+            <div id="userName" class="font-semibold text-white">Dinuka Silva</div>
+            <div id="userRoleBadge" class="text-[10px] text-amber-400 font-medium uppercase">Admin Role</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <div class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+    <!-- Secondary Nav / Tabs & Action Bar -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-200">
+      <nav class="flex space-x-2 overflow-x-auto pb-2 md:pb-0" id="mainTabs">
+        <button onclick="switchTab('dashboard')" class="tab-btn active px-3.5 py-2 text-sm font-semibold rounded-lg bg-slate-900 text-white shadow-sm" data-tab="dashboard">
+          📊 Dashboard
+        </button>
+        <button onclick="switchTab('vehicles')" class="tab-btn px-3.5 py-2 text-sm font-medium rounded-lg text-slate-600 hover:bg-slate-200" data-tab="vehicles">
+          🚗 Vehicles (<span id="countVehicles">0</span>)
+        </button>
+        <button onclick="switchTab('renters')" class="tab-btn px-3.5 py-2 text-sm font-medium rounded-lg text-slate-600 hover:bg-slate-200" data-tab="renters">
+          👤 Client Profiles (<span id="countRenters">0</span>)
+        </button>
+        <button onclick="switchTab('rentals')" class="tab-btn px-3.5 py-2 text-sm font-medium rounded-lg text-slate-600 hover:bg-slate-200" data-tab="rentals">
+          📋 Rentals & Photos (<span id="countRentals">0</span>)
+        </button>
+        <button onclick="switchTab('calendar')" class="tab-btn px-3.5 py-2 text-sm font-medium rounded-lg text-slate-600 hover:bg-slate-200" data-tab="calendar">
+          📅 Booking Calendar (<span id="countReservations">0</span>)
+        </button>
+        <button onclick="switchTab('payments')" class="tab-btn px-3.5 py-2 text-sm font-medium rounded-lg text-slate-600 hover:bg-slate-200" data-tab="payments">
+          💳 Payment Ledger
+        </button>
+        <button onclick="switchTab('costs')" class="tab-btn px-3.5 py-2 text-sm font-medium rounded-lg text-slate-600 hover:bg-slate-200" data-tab="costs">
+          🔧 Costs & Bills
+        </button>
+        <button onclick="switchTab('whatsapp')" class="tab-btn px-3.5 py-2 text-sm font-medium rounded-lg text-slate-600 hover:bg-slate-200" data-tab="whatsapp">
+          💬 WhatsApp Digest
+        </button>
+      </nav>
+
+      <div class="flex items-center space-x-2">
+        <button onclick="resetDemoData()" class="text-xs text-slate-500 hover:text-rose-600 px-2.5 py-1.5 rounded border border-slate-300 bg-white hover:border-rose-300 transition-colors">
+          ↺ Reset Demo Data
+        </button>
+        <button onclick="exportDataJson()" class="text-xs text-slate-600 hover:text-slate-900 px-2.5 py-1.5 rounded border border-slate-300 bg-white hover:bg-slate-50 transition-colors">
+          ⬇ Export JSON
+        </button>
+      </div>
+    </div>
+
+    <!-- Alert / Role info banner -->
+    <div id="roleAlertBanner" class="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between text-xs text-blue-900">
+      <div>
+        <span class="font-bold">Logged in as <span id="bannerRole">Admin</span>:</span>
+        <span id="bannerPermissions">You have full access to view vehicle profit margins, edit cost logs, and generate WhatsApp performance digests.</span>
+      </div>
+      <span class="text-blue-600 font-semibold cursor-pointer underline ml-4" onclick="toggleRoleModal()">Change Role</span>
+    </div>
+
+    <!-- TAB 1: DASHBOARD -->
+    <section id="tab-dashboard" class="tab-content mt-6 space-y-6">
+      <!-- KPI Stats Grid -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Fleet Utilization</p>
+          <div class="mt-2 flex items-baseline justify-between">
+            <h3 class="text-2xl font-bold text-slate-900" id="dashUtilization">0%</h3>
+            <span class="text-xs font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full" id="dashRentedCount">0 Rented</span>
+          </div>
+          <p class="text-xs text-slate-500 mt-1" id="dashFleetBreakdown">4 total vehicles</p>
+        </div>
+
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Active Rentals</p>
+          <div class="mt-2 flex items-baseline justify-between">
+            <h3 class="text-2xl font-bold text-brand-600" id="dashActiveRentals">0</h3>
+            <span class="text-xs text-amber-600 font-semibold bg-amber-50 px-2 py-0.5 rounded-full" id="dashOverdue">0 Due Today</span>
+          </div>
+          <p class="text-xs text-slate-500 mt-1">Pickup/Drop verified</p>
+        </div>
+
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">7-Day Revenue</p>
+          <div class="mt-2 flex items-baseline justify-between">
+            <h3 class="text-2xl font-bold text-emerald-600" id="dashWeeklyRevenue">LKR 0</h3>
+            <span class="text-xs text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded font-mono">LKR</span>
+          </div>
+          <p class="text-xs text-slate-500 mt-1">Recorded via Cash & Transfers</p>
+        </div>
+
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Fleet Net Profit</p>
+          <div class="mt-2 flex items-baseline justify-between">
+            <h3 class="text-2xl font-bold text-slate-900" id="dashNetProfit">LKR 0</h3>
+            <span class="text-xs text-slate-500 font-medium">After costs</span>
+          </div>
+          <p class="text-xs text-slate-500 mt-1" id="dashTotalCosts">Costs: LKR 0</p>
+        </div>
+      </div>
+
+      <!-- Quick Attention & Active Rentals -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Live Action Required / Overdue / Service alerts -->
+        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm lg:col-span-1">
+          <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+            <h3 class="font-bold text-sm text-slate-900 flex items-center space-x-2">
+              <span class="w-2 h-2 rounded-full bg-amber-500 animate-ping"></span>
+              <span>Needs Attention</span>
+            </h3>
+            <span class="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded font-semibold" id="attentionBadgeCount">2</span>
+          </div>
+          <div class="mt-4 space-y-3" id="dashAttentionList">
+            <!-- Dynamic Attention Items -->
+          </div>
+        </div>
+
+        <!-- Per Vehicle Profitability Summary (Admin feature) -->
+        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm lg:col-span-2">
+          <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div>
+              <h3 class="font-bold text-sm text-slate-900">Per-Vehicle Profit & Margin Tracker</h3>
+              <p class="text-xs text-slate-500">Rental revenue minus maintenance, insurance & repairs</p>
+            </div>
+            <button onclick="switchTab('vehicles')" class="text-xs font-semibold text-brand-600 hover:text-brand-800">
+              Manage Fleet →
+            </button>
+          </div>
+          <div class="overflow-x-auto mt-4">
+            <table class="min-w-full divide-y divide-slate-200 text-xs">
+              <thead>
+                <tr class="text-left font-semibold text-slate-500">
+                  <th class="pb-2">Vehicle</th>
+                  <th class="pb-2">Status</th>
+                  <th class="pb-2 text-right">Revenue (LKR)</th>
+                  <th class="pb-2 text-right">Costs (LKR)</th>
+                  <th class="pb-2 text-right">Net Profit</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100" id="dashProfitTableBody">
+                <!-- Injected via JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 2: VEHICLES -->
+    <section id="tab-vehicles" class="tab-content mt-6 space-y-4 hidden">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 class="text-lg font-bold text-slate-900">Fleet Inventory & Profitability</h2>
+          <p class="text-xs text-slate-500">Manage vehicles, monitor service status, and inspect per-vehicle net profit</p>
+        </div>
+        <button onclick="openAddVehicleModal()" class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold flex items-center space-x-1.5 shadow-sm">
+          <span>+ Add New Vehicle</span>
+        </button>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5" id="vehiclesGrid">
+        <!-- Rendered via JS -->
+      </div>
+    </section>
+
+    <!-- TAB 3: RENTERS -->
+    <section id="tab-renters" class="tab-content mt-6 space-y-4 hidden">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 class="text-lg font-bold text-slate-900">Client Profiles & Document Verification</h2>
+          <p class="text-xs text-slate-500">Manage Sri Lankan & foreign tourist records (NIC, DL, IDP, DMT Airport temporary permits)</p>
+        </div>
+        <button onclick="openAddRenterModal()" class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold flex items-center space-x-1.5 shadow-sm">
+          <span>+ Add New Renter</span>
+        </button>
+      </div>
+
+      <div class="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-slate-200 text-xs">
+            <thead class="bg-slate-50 text-slate-600 uppercase font-semibold">
+              <tr>
+                <th class="px-4 py-3 text-left">Profile ID</th>
+                <th class="px-4 py-3 text-left">Client Name & Phone</th>
+                <th class="px-4 py-3 text-left">Type & Origin</th>
+                <th class="px-4 py-3 text-left">Verified Documents</th>
+                <th class="px-4 py-3 text-center">Rental History</th>
+                <th class="px-4 py-3 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-200" id="rentersTableBody">
+              <!-- Rendered via JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 4: RENTALS & PHOTO INSPECTIONS -->
+    <section id="tab-rentals" class="tab-content mt-6 space-y-4 hidden">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 class="text-lg font-bold text-slate-900">Rentals, Checkouts & Condition Photos</h2>
+          <p class="text-xs text-slate-500">6-point pickup and drop-off photo inspection to eliminate damage disputes</p>
+        </div>
+        <button onclick="openCreateRentalModal()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold flex items-center space-x-1.5 shadow-sm">
+          <span>+ Create New Rental</span>
+        </button>
+      </div>
+
+      <div class="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-slate-200 text-xs">
+            <thead class="bg-slate-50 text-slate-600 uppercase font-semibold">
+              <tr>
+                <th class="px-4 py-3 text-left">Rental Code</th>
+                <th class="px-4 py-3 text-left">Vehicle</th>
+                <th class="px-4 py-3 text-left">Renter</th>
+                <th class="px-4 py-3 text-left">Dates & Days</th>
+                <th class="px-4 py-3 text-right">Total (LKR)</th>
+                <th class="px-4 py-3 text-center">Condition Photos</th>
+                <th class="px-4 py-3 text-center">Status</th>
+                <th class="px-4 py-3 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-200" id="rentalsTableBody">
+              <!-- Rendered via JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 5: PAYMENT LEDGER -->
+    <section id="tab-payments" class="tab-content mt-6 space-y-4 hidden">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 class="text-lg font-bold text-slate-900">Payment Ledger & Receipts</h2>
+          <p class="text-xs text-slate-500">Track Cash, Commercial Bank transfers, and Card slips with balance reconciliations</p>
+        </div>
+        <button onclick="openRecordPaymentModal()" class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold flex items-center space-x-1.5 shadow-sm">
+          <span>+ Record Payment</span>
+        </button>
+      </div>
+
+      <div class="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-slate-200 text-xs">
+            <thead class="bg-slate-50 text-slate-600 uppercase font-semibold">
+              <tr>
+                <th class="px-4 py-3 text-left">Receipt No</th>
+                <th class="px-4 py-3 text-left">Date</th>
+                <th class="px-4 py-3 text-left">Renter & Contract</th>
+                <th class="px-4 py-3 text-left">Payment Method</th>
+                <th class="px-4 py-3 text-left">Type / Ref</th>
+                <th class="px-4 py-3 text-right">Amount (LKR)</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-200" id="paymentsTableBody">
+              <!-- Rendered via JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 6: COSTS & SERVICE BILLS -->
+    <section id="tab-costs" class="tab-content mt-6 space-y-4 hidden">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 class="text-lg font-bold text-slate-900">Vehicle Operational Costs & Service Invoices</h2>
+          <p class="text-xs text-slate-500">Log oil changes, tires, insurance, and mechanical repairs with attached bills</p>
+        </div>
+        <button onclick="openAddCostModal()" class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold flex items-center space-x-1.5 shadow-sm">
+          <span>+ Log Vehicle Expense / Bill</span>
+        </button>
+      </div>
+
+      <div class="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-slate-200 text-xs">
+            <thead class="bg-slate-50 text-slate-600 uppercase font-semibold">
+              <tr>
+                <th class="px-4 py-3 text-left">Date</th>
+                <th class="px-4 py-3 text-left">Vehicle Plate</th>
+                <th class="px-4 py-3 text-left">Expense Item & Category</th>
+                <th class="px-4 py-3 text-left">Workshop / Invoice #</th>
+                <th class="px-4 py-3 text-center">Attached Bill</th>
+                <th class="px-4 py-3 text-right">Cost (LKR)</th>
+                <th class="px-4 py-3 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-200" id="costsTableBody">
+              <!-- Rendered via JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 7: WHATSAPP DIGEST -->
+    <section id="tab-whatsapp" class="tab-content mt-6 space-y-6 hidden">
+      <div class="bg-gradient-to-r from-emerald-900 to-slate-900 text-white p-6 rounded-2xl shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div>
+          <div class="flex items-center space-x-2">
+            <span class="text-emerald-400 font-bold text-lg">WhatsApp Weekly Fleet Performance Digest</span>
+            <span class="bg-emerald-500/20 text-emerald-300 text-xs px-2 py-0.5 rounded border border-emerald-500/30">Meta Cloud API</span>
+          </div>
+          <p class="text-xs text-slate-300 mt-1 max-w-xl">
+            Automatically compiled every Monday at 8:00 AM for business owners and fleet managers. Summarizes active rentals, weekly revenue, per-vehicle profits, and pending maintenance.
+          </p>
+        </div>
+        <div class="flex items-center space-x-2">
+          <button onclick="copyWhatsAppData()" class="px-3 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-lg text-xs shadow transition-colors flex items-center space-x-1">
+            <span>📋 Copy Message</span>
+          </button>
+          <a id="btnSendWhatsApp" href="#" target="_blank" class="px-3 py-2 bg-white hover:bg-slate-100 text-slate-900 font-semibold rounded-lg text-xs shadow transition-colors flex items-center space-x-1">
+            <span>🚀 Open in WhatsApp</span>
+          </a>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Live WhatsApp Chat Bubble Preview -->
+        <div class="bg-slate-200 p-5 rounded-2xl border border-slate-300 flex flex-col justify-between">
+          <div class="flex items-center justify-between pb-3 border-b border-slate-300 text-xs font-semibold text-slate-700">
+            <span>📱 WhatsApp Message Preview</span>
+            <span class="text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded font-mono">Recipient: +94 77 000 0000</span>
+          </div>
+          <div class="mt-4 p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-mono text-slate-800 leading-relaxed whitespace-pre-wrap shadow-inner" id="whatsappMessageContent">
+            <!-- Dynamic WhatsApp Message Injected Here -->
+          </div>
+          <div class="mt-4 text-center text-slate-500 text-[11px]">
+            In production, dispatched seamlessly via Meta WhatsApp Business Cloud API webhooks.
+          </div>
+        </div>
+
+        <!-- WhatsApp Configuration Card -->
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+          <h3 class="font-bold text-sm text-slate-900">Automation Settings</h3>
+          <div class="space-y-3 text-xs">
+            <div>
+              <label class="block font-medium text-slate-700">Target Recipient Number (Sri Lanka):</label>
+              <input type="text" id="waRecipientInput" value="+94 77 123 4567" class="mt-1 w-full p-2 border border-slate-300 rounded-lg text-xs" oninput="updateWhatsAppPreview()">
+            </div>
+            <div>
+              <label class="block font-medium text-slate-700">Dispatch Schedule:</label>
+              <input type="text" disabled value="Every Monday at 08:00 AM SLST (+05:30)" class="mt-1 w-full p-2 bg-slate-100 border border-slate-200 rounded-lg text-xs text-slate-500">
+            </div>
+            <div class="pt-2 border-t border-slate-100">
+              <label class="block font-medium text-slate-700 mb-1">Included Digest Sections:</label>
+              <div class="space-y-1.5 text-slate-600">
+                <label class="flex items-center space-x-2"><input type="checkbox" checked disabled> <span>Active fleet utilization & vehicle breakdown</span></label>
+                <label class="flex items-center space-x-2"><input type="checkbox" checked disabled> <span>7-day rental revenue collection (LKR)</span></label>
+                <label class="flex items-center space-x-2"><input type="checkbox" checked disabled> <span>Maintenance costs logged during the week</span></label>
+                <label class="flex items-center space-x-2"><input type="checkbox" checked disabled> <span>Overdue returns & drop-off alerts</span></label>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 8: BOOKING CALENDAR & EARLY RESERVATIONS -->
+    <section id="tab-calendar" class="tab-content mt-6 space-y-6 hidden">
+      <!-- Calendar Header & Control Bar -->
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+        <div>
+          <div class="flex items-center space-x-2">
+            <h2 class="text-lg font-bold text-slate-900">Fleet Booking Calendar & Early Reservations</h2>
+            <span class="bg-amber-100 text-amber-900 text-[11px] font-bold px-2 py-0.5 rounded-full border border-amber-200">Live Schedule</span>
+          </div>
+          <p class="text-xs text-slate-500 mt-0.5">Track active rentals, early customer bookings, and fleet availability with zero double-bookings.</p>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2">
+          <!-- Public Guest Link Button -->
+          <button onclick="openPublicPortal()" class="px-3.5 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl text-xs font-semibold flex items-center space-x-1.5 shadow-sm transition-all border border-emerald-500/30">
+            <span>🌐 Open Guest Front Link</span>
+            <span class="bg-white/20 text-white text-[10px] px-1.5 py-0.2 rounded font-mono">No App</span>
+          </button>
+
+          <!-- Add Manual Booking Button -->
+          <button onclick="openManualBookingModal()" class="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-semibold flex items-center space-x-1.5 shadow-sm transition-all">
+            <span>+ Add Manual Early Booking</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Month Navigation & Color Legend -->
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-100/80 p-3.5 rounded-xl border border-slate-200 text-xs">
+        <!-- Month Navigator -->
+        <div class="flex items-center space-x-2">
+          <button onclick="navigateMonth(-1)" class="p-1.5 rounded-lg bg-white hover:bg-slate-200 text-slate-700 border border-slate-300 shadow-sm font-bold">
+            ◀ Prev
+          </button>
+          <span id="calCurrentMonthLabel" class="font-bold text-sm text-slate-900 px-3 py-1 bg-white rounded-lg border border-slate-300 min-w-[140px] text-center shadow-sm">
+            October 2026
+          </span>
+          <button onclick="navigateMonth(1)" class="p-1.5 rounded-lg bg-white hover:bg-slate-200 text-slate-700 border border-slate-300 shadow-sm font-bold">
+            Next ▶
+          </button>
+          <button onclick="navigateMonth(0)" class="px-2.5 py-1 rounded-lg bg-white hover:bg-slate-200 text-slate-700 border border-slate-300 font-semibold shadow-sm text-[11px]">
+            Today
+          </button>
+        </div>
+
+        <!-- Color Legend -->
+        <div class="flex flex-wrap items-center gap-3 text-[11px] font-medium text-slate-600">
+          <span class="flex items-center space-x-1.5">
+            <span class="w-3 h-3 rounded-md bg-emerald-500 shadow-xs"></span>
+            <span>Active Rental (On Road)</span>
+          </span>
+          <span class="flex items-center space-x-1.5">
+            <span class="w-3 h-3 rounded-md bg-amber-400 shadow-xs"></span>
+            <span>Early Booking (Reserved)</span>
+          </span>
+          <span class="flex items-center space-x-1.5">
+            <span class="w-3 h-3 rounded-md bg-rose-400 shadow-xs"></span>
+            <span>In Service / Maintenance</span>
+          </span>
+          <span class="flex items-center space-x-1.5">
+            <span class="w-3 h-3 rounded-md bg-slate-200 border border-slate-300"></span>
+            <span>Available (Click to Book)</span>
+          </span>
+        </div>
+      </div>
+
+      <!-- Fleet Gantt Matrix Grid -->
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="p-4 border-b border-slate-200 flex items-center justify-between">
+          <h3 class="text-xs font-bold text-slate-900 uppercase tracking-wider">Fleet Schedule Matrix</h3>
+          <span class="text-[11px] text-slate-500">💡 Click any booked block to view details, or click an available date to reserve manually</span>
+        </div>
+
+        <div class="overflow-x-auto max-h-[500px]" id="calendarGanttWrapper">
+          <!-- Calendar Matrix rendered via JS -->
+          <div id="calendarMatrixContainer"></div>
+        </div>
+      </div>
+
+      <!-- Upcoming Early Reservations Table -->
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="p-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <h3 class="text-xs font-bold text-slate-900 uppercase tracking-wider">Upcoming Early Bookings & Reservations</h3>
+            <p class="text-[11px] text-slate-500">Confirmed customer reservations awaiting vehicle pickup and handover</p>
+          </div>
+          <span id="earlyReservationsBadge" class="bg-amber-100 text-amber-900 font-bold px-2.5 py-1 rounded-full text-xs">
+            0 Early Bookings
+          </span>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-slate-200 text-xs">
+            <thead class="bg-slate-50 text-slate-600 uppercase font-semibold">
+              <tr>
+                <th class="px-4 py-3 text-left">Booking Ref</th>
+                <th class="px-4 py-3 text-left">Vehicle</th>
+                <th class="px-4 py-3 text-left">Renter Details</th>
+                <th class="px-4 py-3 text-left">Reserved Dates & Days</th>
+                <th class="px-4 py-3 text-right">Est. Rental (LKR)</th>
+                <th class="px-4 py-3 text-center">Deposit</th>
+                <th class="px-4 py-3 text-center">Source</th>
+                <th class="px-4 py-3 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-200" id="earlyReservationsTableBody">
+              <!-- Rendered via JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- MODALS CONTAINER -->
+
+  <!-- Modal: Vehicle Detail & Cost / Net Profit Breakdown -->
+  <div id="modalVehicleDetail" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 shadow-2xl">
+      <div class="flex items-center justify-between pb-4 border-b border-slate-200">
+        <div>
+          <h3 class="text-base font-bold text-slate-900" id="mvdTitle">Vehicle Details</h3>
+          <p class="text-xs text-slate-500" id="mvdPlate">WP CAH-4821</p>
+        </div>
+        <button onclick="closeModal('modalVehicleDetail')" class="text-slate-400 hover:text-slate-600 text-lg">✕</button>
+      </div>
+      <div class="mt-4 space-y-4 text-xs" id="mvdBody">
+        <!-- Rendered dynamically -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Inspection Photo Viewer (Before/After) -->
+  <div id="modalInspectionPhotos" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto p-6 shadow-2xl">
+      <div class="flex items-center justify-between pb-4 border-b border-slate-200">
+        <div>
+          <h3 class="text-base font-bold text-slate-900" id="mipTitle">Vehicle Condition Inspection Photos</h3>
+          <p class="text-xs text-slate-500" id="mipSubtitle">Side-by-side comparison (Pickup vs Return Drop)</p>
+        </div>
+        <button onclick="closeModal('modalInspectionPhotos')" class="text-slate-400 hover:text-slate-600 text-lg">✕</button>
+      </div>
+      <div class="mt-4 space-y-4" id="mipGrid">
+        <!-- Rendered dynamically -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Add Vehicle -->
+  <div id="modalAddVehicle" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-200">
+        <h3 class="text-sm font-bold text-slate-900">Add Vehicle to Fleet</h3>
+        <button onclick="closeModal('modalAddVehicle')" class="text-slate-400 hover:text-slate-600">✕</button>
+      </div>
+      <form onsubmit="handleAddVehicle(event)" class="mt-4 space-y-3 text-xs">
+        <div>
+          <label class="block font-medium text-slate-700">License Plate (Sri Lanka):</label>
+          <input type="text" id="avPlate" required placeholder="e.g. WP CBA-7819" class="mt-1 w-full p-2 border border-slate-300 rounded-lg">
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block font-medium text-slate-700">Make:</label>
+            <input type="text" id="avMake" required placeholder="Toyota / Suzuki" class="mt-1 w-full p-2 border border-slate-300 rounded-lg">
+          </div>
+          <div>
+            <label class="block font-medium text-slate-700">Model:</label>
+            <input type="text" id="avModel" required placeholder="Axio / Alto" class="mt-1 w-full p-2 border border-slate-300 rounded-lg">
+          </div>
+        </div>
+        <div class="grid grid-cols-3 gap-2">
+          <div>
+            <label class="block font-medium text-slate-700">Year:</label>
+            <input type="number" id="avYear" value="2023" class="mt-1 w-full p-2 border border-slate-300 rounded-lg">
+          </div>
+          <div>
+            <label class="block font-medium text-slate-700">Fuel:</label>
+            <select id="avFuel" class="mt-1 w-full p-2 border border-slate-300 rounded-lg">
+              <option>Petrol</option>
+              <option>Hybrid</option>
+              <option>Diesel</option>
+            </select>
+          </div>
+          <div>
+            <label class="block font-medium text-slate-700">Daily Rate (LKR):</label>
+            <input type="number" id="avDailyRate" required value="12000" class="mt-1 w-full p-2 border border-slate-300 rounded-lg">
+          </div>
+        </div>
+        <div class="flex justify-end space-x-2 pt-3 border-t border-slate-100">
+          <button type="button" onclick="closeModal('modalAddVehicle')" class="px-3 py-1.5 border border-slate-300 rounded-lg text-slate-600">Cancel</button>
+          <button type="submit" class="px-4 py-1.5 bg-slate-900 text-white font-semibold rounded-lg">Save Vehicle</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Add Renter -->
+  <div id="modalAddRenter" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-200">
+        <h3 class="text-sm font-bold text-slate-900">Add Client Profile</h3>
+        <button onclick="closeModal('modalAddRenter')" class="text-slate-400 hover:text-slate-600">✕</button>
+      </div>
+      <form onsubmit="handleAddRenter(event)" class="mt-4 space-y-3 text-xs">
+        <div>
+          <label class="block font-medium text-slate-700">Full Name:</label>
+          <input type="text" id="arName" required placeholder="e.g. Ruwan Jayasuriya" class="mt-1 w-full p-2 border border-slate-300 rounded-lg">
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block font-medium text-slate-700">Phone Number:</label>
+            <input type="text" id="arPhone" required placeholder="+94 77 000 0000" class="mt-1 w-full p-2 border border-slate-300 rounded-lg">
+          </div>
+          <div>
+            <label class="block font-medium text-slate-700">Client Type:</label>
+            <select id="arType" class="mt-1 w-full p-2 border border-slate-300 rounded-lg" onchange="toggleTouristFields()">
+              <option value="local">Sri Lankan Resident</option>
+              <option value="tourist">Foreign Tourist</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label class="block font-medium text-slate-700">Document Type Verified:</label>
+          <select id="arDocType" class="mt-1 w-full p-2 border border-slate-300 rounded-lg">
+            <option>National Identity Card (NIC)</option>
+            <option>Sri Lanka Driving License</option>
+            <option>Passport (Foreign Tourist)</option>
+            <option>International Driving Permit (AA Ceylon)</option>
+            <option>DMT Airport Temporary Driving Permit</option>
+          </select>
+        </div>
+        <div>
+          <label class="block font-medium text-slate-700">Document / ID Number:</label>
+          <input type="text" id="arDocNumber" required placeholder="NIC or Passport / Permit #" class="mt-1 w-full p-2 border border-slate-300 rounded-lg">
+        </div>
+        <div class="flex justify-end space-x-2 pt-3 border-t border-slate-100">
+          <button type="button" onclick="closeModal('modalAddRenter')" class="px-3 py-1.5 border border-slate-300 rounded-lg text-slate-600">Cancel</button>
+          <button type="submit" class="px-4 py-1.5 bg-slate-900 text-white font-semibold rounded-lg">Create Profile</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Create Rental -->
+  <div id="modalCreateRental" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-200">
+        <h3 class="text-sm font-bold text-slate-900">Create New Rental Contract</h3>
+        <button onclick="closeModal('modalCreateRental')" class="text-slate-400 hover:text-slate-600">✕</button>
+      </div>
+      <form onsubmit="handleCreateRental(event)" class="mt-4 space-y-3 text-xs">
+        <div>
+          <label class="block font-medium text-slate-700">Select Available Vehicle:</label>
+          <select id="crVehicle" class="mt-1 w-full p-2 border border-slate-300 rounded-lg" onchange="calculateRentalTotal()">
+            <!-- Populated via JS -->
+          </select>
+        </div>
+        <div>
+          <label class="block font-medium text-slate-700">Select Renter:</label>
+          <select id="crRenter" class="mt-1 w-full p-2 border border-slate-300 rounded-lg">
+            <!-- Populated via JS -->
+          </select>
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block font-medium text-slate-700">Rental Days:</label>
+            <input type="number" id="crDays" min="1" value="3" class="mt-1 w-full p-2 border border-slate-300 rounded-lg" oninput="calculateRentalTotal()">
+          </div>
+          <div>
+            <label class="block font-medium text-slate-700">Security Deposit (LKR):</label>
+            <input type="number" id="crDeposit" value="25000" class="mt-1 w-full p-2 border border-slate-300 rounded-lg">
+          </div>
+        </div>
+        <div class="p-3 bg-slate-50 border border-slate-200 rounded-lg text-slate-700">
+          <div class="flex justify-between font-semibold">
+            <span>Calculated Total:</span>
+            <span id="crCalculatedTotal" class="text-emerald-700 font-bold">LKR 0</span>
+          </div>
+        </div>
+        <div class="flex justify-end space-x-2 pt-3 border-t border-slate-100">
+          <button type="button" onclick="closeModal('modalCreateRental')" class="px-3 py-1.5 border border-slate-300 rounded-lg text-slate-600">Cancel</button>
+          <button type="submit" class="px-4 py-1.5 bg-emerald-600 text-white font-semibold rounded-lg">Issue Rental</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Record Payment -->
+  <div id="modalRecordPayment" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-200">
+        <h3 class="text-sm font-bold text-slate-900">Record Payment</h3>
+        <button onclick="closeModal('modalRecordPayment')" class="text-slate-400 hover:text-slate-600">✕</button>
+      </div>
+      <form onsubmit="handleRecordPayment(event)" class="mt-4 space-y-3 text-xs">
+        <div>
+          <label class="block font-medium text-slate-700">Select Rental / Renter:</label>
+          <select id="rpRental" class="mt-1 w-full p-2 border border-slate-300 rounded-lg">
+            <!-- Populated via JS -->
+          </select>
+        </div>
+        <div>
+          <label class="block font-medium text-slate-700">Amount (LKR):</label>
+          <input type="number" id="rpAmount" required value="20000" class="mt-1 w-full p-2 border border-slate-300 rounded-lg">
+        </div>
+        <div>
+          <label class="block font-medium text-slate-700">Payment Method:</label>
+          <select id="rpMethod" class="mt-1 w-full p-2 border border-slate-300 rounded-lg">
+            <option>Cash (LKR)</option>
+            <option>Bank Transfer (Commercial Bank / Sampath / HNB)</option>
+            <option>Credit/Debit Card Slip</option>
+          </select>
+        </div>
+        <div>
+          <label class="block font-medium text-slate-700">Transaction Ref / Slip #:</label>
+          <input type="text" id="rpRef" placeholder="e.g. COM-TXN-84920" class="mt-1 w-full p-2 border border-slate-300 rounded-lg">
+        </div>
+        <div class="flex justify-end space-x-2 pt-3 border-t border-slate-100">
+          <button type="button" onclick="closeModal('modalRecordPayment')" class="px-3 py-1.5 border border-slate-300 rounded-lg text-slate-600">Cancel</button>
+          <button type="submit" class="px-4 py-1.5 bg-slate-900 text-white font-semibold rounded-lg">Save & Issue Receipt</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Guest Self-Registration & Early Booking Public Portal (No App Needed) -->
+  <div id="modalPublicPortal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-50 hidden flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+    <div class="bg-white rounded-3xl max-w-4xl w-full max-h-[92vh] overflow-y-auto p-5 sm:p-8 shadow-2xl border border-slate-100 flex flex-col my-auto">
+      <!-- Portal Header -->
+      <div class="flex items-start justify-between pb-5 border-b border-slate-200">
+        <div class="flex items-center space-x-3.5">
+          <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 to-amber-600 flex items-center justify-center font-bold text-slate-950 text-2xl shadow-md">
+            S
+          </div>
+          <div>
+            <div class="flex items-center space-x-2">
+              <h3 class="text-lg font-bold text-slate-900">Shenaly Rent a Car · Guest Portal</h3>
+              <span class="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-200">No App Required</span>
+            </div>
+            <p class="text-xs text-slate-500">Customer self-registration, compliance verification & early vehicle reservation</p>
+          </div>
+        </div>
+        <div class="flex items-center space-x-2">
+          <button onclick="copyGuestPortalLink()" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs rounded-xl font-medium border border-slate-200 flex items-center space-x-1.5 transition-colors" title="Copy shareable customer link">
+            <span>🔗 Copy Public Link</span>
+          </button>
+          <button onclick="closeModal('modalPublicPortal')" class="text-slate-400 hover:text-slate-600 text-xl p-1">✕</button>
+        </div>
+      </div>
+
+      <!-- Step Indicator -->
+      <div class="grid grid-cols-3 gap-2 my-5 text-center text-xs font-semibold">
+        <div id="portalStepIndicator1" class="py-2 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 shadow-xs">
+          1. Identity & Compliance
+        </div>
+        <div id="portalStepIndicator2" class="py-2 rounded-xl bg-slate-100 border border-slate-200 text-slate-500">
+          2. Vehicle & Dates
+        </div>
+        <div id="portalStepIndicator3" class="py-2 rounded-xl bg-slate-100 border border-slate-200 text-slate-500">
+          3. Confirmation Voucher
+        </div>
+      </div>
+
+      <!-- STEP 1: Renter Self-Registration Form -->
+      <div id="portalStep1" class="space-y-5">
+        <div class="bg-blue-50/70 p-3.5 rounded-2xl border border-blue-200/80 text-xs text-blue-900 flex items-center space-x-3">
+          <span class="text-lg">ℹ️</span>
+          <span>Sri Lankan law & comprehensive rental insurance require valid driving credentials before vehicle handover. Your uploaded documents are securely processed with pre-signed access tokens.</span>
+        </div>
+
+        <form id="publicRegisterForm" onsubmit="handlePublicStep1(event)" class="space-y-4 text-xs">
+          <!-- Resident Type Switcher -->
+          <div>
+            <label class="block font-bold text-slate-800 mb-1.5">Renter Category / Nationality:</label>
+            <div class="grid grid-cols-2 gap-3">
+              <label class="cursor-pointer border-2 border-amber-500 bg-amber-50/40 p-3 rounded-2xl flex items-center space-x-2.5 transition-all" id="labelLocalRenter">
+                <input type="radio" name="pubRenterType" value="local" checked onchange="togglePublicRenterType('local')" class="accent-amber-600">
+                <div>
+                  <div class="font-bold text-slate-900 text-xs">🇱🇰 Sri Lankan Resident</div>
+                  <div class="text-[11px] text-slate-500">Requires National ID Card (NIC) & Sri Lanka Driving License</div>
+                </div>
+              </label>
+
+              <label class="cursor-pointer border-2 border-slate-200 bg-white p-3 rounded-2xl flex items-center space-x-2.5 transition-all" id="labelTouristRenter">
+                <input type="radio" name="pubRenterType" value="tourist" onchange="togglePublicRenterType('tourist')" class="accent-amber-600">
+                <div>
+                  <div class="font-bold text-slate-900 text-xs">✈️ International Tourist / Visitor</div>
+                  <div class="text-[11px] text-slate-500">Requires Passport & International Permit (IDP / DMT Permit)</div>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <!-- Personal Information Grid -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            <div>
+              <label class="block font-medium text-slate-700">Full Name (as in Passport/NIC):</label>
+              <input type="text" id="pubName" required placeholder="e.g. Liam Smith / Kasun Jayawardena" class="mt-1 w-full p-2.5 border border-slate-300 rounded-xl">
+            </div>
+            <div>
+              <label class="block font-medium text-slate-700">WhatsApp / Mobile Number:</label>
+              <input type="tel" id="pubPhone" required placeholder="+94 77 123 4567 or +44 7911..." class="mt-1 w-full p-2.5 border border-slate-300 rounded-xl">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            <div>
+              <label class="block font-medium text-slate-700">Email Address:</label>
+              <input type="email" id="pubEmail" required placeholder="you@email.com" class="mt-1 w-full p-2.5 border border-slate-300 rounded-xl">
+            </div>
+            <div id="pubCountryWrapper" class="hidden">
+              <label class="block font-medium text-slate-700">Country of Origin:</label>
+              <input type="text" id="pubCountry" placeholder="e.g. United Kingdom, Germany, Australia" class="mt-1 w-full p-2.5 border border-slate-300 rounded-xl">
+            </div>
+            <div id="pubAddressWrapper">
+              <label class="block font-medium text-slate-700">Residential Address in Sri Lanka:</label>
+              <input type="text" id="pubAddress" placeholder="e.g. 42 Flower Road, Colombo 07" class="mt-1 w-full p-2.5 border border-slate-300 rounded-xl">
+            </div>
+          </div>
+
+          <!-- Tourist Hotel / Local Stay field -->
+          <div id="pubTouristStayWrapper" class="hidden">
+            <label class="block font-medium text-slate-700">Hotel / Temporary Stay Address in Sri Lanka:</label>
+            <input type="text" id="pubHotelAddress" placeholder="e.g. Cinnamon Grand Colombo / Villa in Mirissa" class="mt-1 w-full p-2.5 border border-slate-300 rounded-xl">
+          </div>
+
+          <!-- Document Upload Fields (Sri Lankan) -->
+          <div id="pubLocalDocsGroup" class="space-y-3 p-4 bg-slate-50 rounded-2xl border border-slate-200">
+            <div class="font-bold text-slate-800 text-xs">📄 Sri Lankan Identity & License Verification</div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block font-medium text-slate-700">NIC Number:</label>
+                <input type="text" id="pubNicNumber" placeholder="199283019283 / 881230456V" class="mt-1 w-full p-2 border border-slate-300 rounded-xl">
+                <div class="mt-1.5 flex items-center justify-between text-[11px] text-slate-500">
+                  <span>Upload NIC (Front & Back):</span>
+                  <label class="cursor-pointer text-brand-700 font-semibold hover:underline">
+                    <span>📷 Snap / Select File</span>
+                    <input type="file" class="hidden" onchange="alert('NIC document attached successfully (stored securely in S3).')">
+                  </label>
+                </div>
+              </div>
+
+              <div>
+                <label class="block font-medium text-slate-700">Sri Lanka Driving License No:</label>
+                <input type="text" id="pubDlNumber" placeholder="B4920194" class="mt-1 w-full p-2 border border-slate-300 rounded-xl">
+                <div class="mt-1.5 flex items-center justify-between text-[11px] text-slate-500">
+                  <span>Upload Driving License:</span>
+                  <label class="cursor-pointer text-brand-700 font-semibold hover:underline">
+                    <span>📷 Snap / Select File</span>
+                    <input type="file" class="hidden" onchange="alert('Driving License attached successfully.')">
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Document Upload Fields (Foreign Tourist) -->
+          <div id="pubTouristDocsGroup" class="space-y-3 p-4 bg-slate-50 rounded-2xl border border-slate-200 hidden">
+            <div class="font-bold text-slate-800 text-xs">✈️ Tourist Passport & Sri Lanka Driving Permit</div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block font-medium text-slate-700">Passport Number:</label>
+                <input type="text" id="pubPassportNumber" placeholder="e.g. GB9821034" class="mt-1 w-full p-2 border border-slate-300 rounded-xl">
+                <div class="mt-1.5 flex items-center justify-between text-[11px] text-slate-500">
+                  <span>Upload Passport Bio-Page:</span>
+                  <label class="cursor-pointer text-brand-700 font-semibold hover:underline">
+                    <span>📷 Snap / Upload</span>
+                    <input type="file" class="hidden" onchange="alert('Passport scan attached.')">
+                  </label>
+                </div>
+              </div>
+
+              <div>
+                <label class="block font-medium text-slate-700">Permit Type in Sri Lanka:</label>
+                <select id="pubPermitType" class="mt-1 w-full p-2 border border-slate-300 rounded-xl">
+                  <option>International Driving Permit (AA Ceylon recognized)</option>
+                  <option>DMT Airport Temporary Driving Permit (BIA counter)</option>
+                  <option>Need Shenaly assistance with DMT Airport Permit</option>
+                </select>
+                <div class="mt-1.5 flex items-center justify-between text-[11px] text-slate-500">
+                  <span>Upload Permit Scan/Photo:</span>
+                  <label class="cursor-pointer text-brand-700 font-semibold hover:underline">
+                    <span>📷 Snap / Upload</span>
+                    <input type="file" class="hidden" onchange="alert('Permit scan attached.')">
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Emergency Contact -->
+          <div class="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            <div>
+              <label class="block font-medium text-slate-700">Emergency Contact Name:</label>
+              <input type="text" id="pubEmName" placeholder="e.g. Dilhani Silva / John Smith" class="mt-1 w-full p-2 border border-slate-300 rounded-xl">
+            </div>
+            <div>
+              <label class="block font-medium text-slate-700">Emergency Phone:</label>
+              <input type="tel" id="pubEmPhone" placeholder="+94 71 ... or overseas no" class="mt-1 w-full p-2 border border-slate-300 rounded-xl">
+            </div>
+            <div>
+              <label class="block font-medium text-slate-700">Relationship:</label>
+              <input type="text" id="pubEmRel" placeholder="e.g. Spouse / Sibling / Parent" class="mt-1 w-full p-2 border border-slate-300 rounded-xl">
+            </div>
+          </div>
+
+          <div class="flex justify-end pt-3">
+            <button type="submit" class="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl shadow-md flex items-center space-x-1.5">
+              <span>Next: Select Dates & Choose Vehicle ▶</span>
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- STEP 2: Early Vehicle Booking & Date Picker -->
+      <div id="portalStep2" class="space-y-5 hidden">
+        <div class="flex items-center justify-between bg-emerald-50 p-3.5 rounded-2xl border border-emerald-200 text-xs text-emerald-900">
+          <div>
+            <span class="font-bold">Guest Profile Ready:</span> <span id="pubReadyGuestName" class="font-semibold"></span>
+          </div>
+          <button type="button" onclick="goToPublicStep(1)" class="text-emerald-700 hover:underline font-semibold">Edit Info ✎</button>
+        </div>
+
+        <form id="publicBookingForm" onsubmit="handlePublicStep2(event)" class="space-y-4 text-xs">
+          <!-- Dates Selection -->
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-50 p-4 rounded-2xl border border-slate-200">
+            <div>
+              <label class="block font-bold text-slate-800">Pickup Date & Time:</label>
+              <input type="date" id="pubStartDate" required onchange="calculatePublicBookingTotal()" class="mt-1 w-full p-2.5 border border-slate-300 rounded-xl">
+            </div>
+            <div>
+              <label class="block font-bold text-slate-800">Return Date & Time:</label>
+              <input type="date" id="pubEndDate" required onchange="calculatePublicBookingTotal()" class="mt-1 w-full p-2.5 border border-slate-300 rounded-xl">
+            </div>
+            <div>
+              <label class="block font-bold text-slate-800">Calculated Duration:</label>
+              <div id="pubDurationBadge" class="mt-1 p-2.5 bg-white border border-slate-300 rounded-xl text-center font-bold text-slate-900 text-sm">
+                5 Days
+              </div>
+            </div>
+          </div>
+
+          <!-- Vehicle Selector Cards -->
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <label class="block font-bold text-slate-800">Select Available Vehicle from Fleet:</label>
+              <span class="text-[11px] text-slate-500">All vehicles are comprehensively insured & GPS certified</span>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3" id="pubVehicleGrid">
+              <!-- Rendered via JS -->
+            </div>
+          </div>
+
+          <!-- Special Requests & Airport Delivery -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block font-medium text-slate-700">Flight Number / Airport Delivery:</label>
+              <input type="text" id="pubFlightInfo" placeholder="e.g. UL 504 / Deliver to BIA Airport" class="mt-1 w-full p-2.5 border border-slate-300 rounded-xl">
+            </div>
+            <div>
+              <label class="block font-medium text-slate-700">Special Notes or Requests:</label>
+              <input type="text" id="pubSpecialNotes" placeholder="e.g. Child car seat required, early morning handover" class="mt-1 w-full p-2.5 border border-slate-300 rounded-xl">
+            </div>
+          </div>
+
+          <!-- Estimated Total Summary Card -->
+          <div class="p-4 bg-slate-900 text-white rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md">
+            <div>
+              <div class="text-[11px] text-slate-400">Estimated Total (Inclusive of Taxes):</div>
+              <div class="text-2xl font-black text-amber-400" id="pubTotalRentalLKR">LKR 0</div>
+              <div class="text-[11px] text-slate-400 mt-0.5">Refundable Security Deposit: <span id="pubDepositLKR" class="text-white font-bold">LKR 0</span></div>
+            </div>
+            <div class="flex items-center space-x-2">
+              <button type="button" onclick="goToPublicStep(1)" class="px-4 py-2.5 border border-slate-700 text-slate-300 hover:text-white rounded-xl font-medium">
+                Back
+              </button>
+              <button type="submit" class="px-6 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-extrabold rounded-xl shadow-lg transition-all">
+                Confirm Early Reservation ➔
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+
+      <!-- STEP 3: Instant Confirmation Voucher -->
+      <div id="portalStep3" class="space-y-5 hidden text-center">
+        <div class="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-3xl mx-auto shadow-sm">
+          ✓
+        </div>
+        <div>
+          <h4 class="text-xl font-bold text-slate-900">Registration & Early Reservation Confirmed!</h4>
+          <p class="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+            Your customer profile and early vehicle booking have been securely logged into the Shenaly Rent a Car fleet management database.
+          </p>
+        </div>
+
+        <!-- Digital Voucher Card -->
+        <div class="max-w-md mx-auto bg-slate-50 border-2 border-dashed border-slate-300 rounded-3xl p-5 text-left text-xs space-y-3 shadow-sm">
+          <div class="flex items-center justify-between border-b border-slate-200 pb-3">
+            <div>
+              <div class="text-[10px] text-slate-400 uppercase font-semibold">Renter Profile ID</div>
+              <div class="font-mono text-base font-extrabold text-brand-700" id="vouchProfileId">SR-0150</div>
+            </div>
+            <div class="text-right">
+              <div class="text-[10px] text-slate-400 uppercase font-semibold">Booking Reference</div>
+              <div class="font-mono text-base font-extrabold text-slate-900" id="vouchBookingCode">BK-2026-0044</div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2 text-slate-700">
+            <div>
+              <span class="text-slate-400 text-[10px] block">Renter Name:</span>
+              <span class="font-bold text-slate-900" id="vouchName">Liam Smith</span>
+            </div>
+            <div>
+              <span class="text-slate-400 text-[10px] block">Phone / WhatsApp:</span>
+              <span class="font-bold text-slate-900" id="vouchPhone">+44 7911 123456</span>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2 text-slate-700 pt-2 border-t border-slate-200">
+            <div>
+              <span class="text-slate-400 text-[10px] block">Reserved Vehicle:</span>
+              <span class="font-bold text-slate-900" id="vouchVehicle">Toyota Raize</span>
+            </div>
+            <div>
+              <span class="text-slate-400 text-[10px] block">Vehicle Plate:</span>
+              <span class="font-mono font-bold text-slate-900" id="vouchPlate">WP CBA-7706</span>
+            </div>
+          </div>
+
+          <div class="pt-2 border-t border-slate-200">
+            <span class="text-slate-400 text-[10px] block">Booking Dates:</span>
+            <span class="font-bold text-slate-900" id="vouchDates">2026-10-22 to 2026-10-27 (5 Days)</span>
+          </div>
+
+          <div class="flex items-center justify-between pt-2 border-t border-slate-200 font-bold">
+            <span class="text-slate-600">Total Rental Payable:</span>
+            <span class="text-base text-brand-700" id="vouchTotal">LKR 112,500</span>
+          </div>
+          <div class="flex items-center justify-between text-[11px] text-slate-500">
+            <span>Refundable Security Deposit:</span>
+            <span class="font-bold text-slate-700" id="vouchDeposit">LKR 35,000</span>
+          </div>
+        </div>
+
+        <!-- WhatsApp Action Button -->
+        <div class="pt-2 space-y-2 max-w-md mx-auto">
+          <a id="vouchWhatsAppBtn" href="#" target="_blank" class="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-bold text-xs flex items-center justify-center space-x-2 shadow-lg transition-all">
+            <span>💬 Send Confirmation to Shenaly (+94 77 123 4567)</span>
+          </a>
+          <button onclick="finishPublicPortal()" class="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl font-semibold text-xs border border-slate-300">
+            Done & Return to Fleet Portal
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Add Manual Early Booking (Staff / Admin) -->
+  <div id="modalManualEarlyBooking" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 shadow-2xl border border-slate-100">
+      <div class="flex items-center justify-between pb-3.5 border-b border-slate-200">
+        <div>
+          <h3 class="text-base font-bold text-slate-900">+ Add Manual Early Booking</h3>
+          <p class="text-xs text-slate-500">Schedule a future vehicle reservation directly into the calendar</p>
+        </div>
+        <button onclick="closeModal('modalManualEarlyBooking')" class="text-slate-400 hover:text-slate-600 text-lg">✕</button>
+      </div>
+
+      <form onsubmit="handleCreateManualBooking(event)" class="mt-4 space-y-3.5 text-xs">
+        <!-- Vehicle Select -->
+        <div>
+          <label class="block font-medium text-slate-700">Select Vehicle:</label>
+          <select id="mbVehicle" required onchange="handleManualBookingVehicleChange()" class="mt-1 w-full p-2.5 border border-slate-300 rounded-xl">
+            <!-- Populated via JS -->
+          </select>
+        </div>
+
+        <!-- Renter Select -->
+        <div>
+          <div class="flex items-center justify-between">
+            <label class="block font-medium text-slate-700">Renter Profile:</label>
+            <button type="button" onclick="closeModal('modalManualEarlyBooking'); openModal('modalAddRenter')" class="text-[11px] text-blue-600 hover:underline font-semibold">
+              + Register New Renter
+            </button>
+          </div>
+          <select id="mbRenter" required class="mt-1 w-full p-2.5 border border-slate-300 rounded-xl">
+            <!-- Populated via JS -->
+          </select>
+        </div>
+
+        <!-- Date Range -->
+        <div class="grid grid-cols-2 gap-2.5">
+          <div>
+            <label class="block font-medium text-slate-700">Pickup Date:</label>
+            <input type="date" id="mbStartDate" required onchange="calculateManualBookingTotal()" class="mt-1 w-full p-2.5 border border-slate-300 rounded-xl">
+          </div>
+          <div>
+            <label class="block font-medium text-slate-700">Return Date:</label>
+            <input type="date" id="mbEndDate" required onchange="calculateManualBookingTotal()" class="mt-1 w-full p-2.5 border border-slate-300 rounded-xl">
+          </div>
+        </div>
+
+        <!-- Daily Rate & Days -->
+        <div class="grid grid-cols-2 gap-2.5">
+          <div>
+            <label class="block font-medium text-slate-700">Daily Rate (LKR):</label>
+            <input type="number" id="mbDailyRate" required oninput="calculateManualBookingTotal()" class="mt-1 w-full p-2 border border-slate-300 rounded-xl font-mono">
+          </div>
+          <div>
+            <label class="block font-medium text-slate-700">Security Deposit (LKR):</label>
+            <input type="number" id="mbDeposit" required value="35000" class="mt-1 w-full p-2 border border-slate-300 rounded-xl font-mono">
+          </div>
+        </div>
+
+        <!-- Calculated Summary -->
+        <div class="p-3 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between">
+          <div>
+            <span class="text-[11px] text-slate-500 block">Calculated Total:</span>
+            <span id="mbCalculatedDays" class="text-xs font-semibold text-slate-700">0 Days</span>
+          </div>
+          <div class="text-right">
+            <span class="text-base font-extrabold text-brand-700" id="mbCalculatedTotal">LKR 0</span>
+          </div>
+        </div>
+
+        <!-- Advance Deposit Collected (Optional) -->
+        <div class="p-3 bg-amber-50/60 border border-amber-200 rounded-2xl space-y-2">
+          <label class="flex items-center space-x-2">
+            <input type="checkbox" id="mbCollectAdvance" onchange="toggleAdvancePaymentFields()" class="accent-amber-600">
+            <span class="font-bold text-slate-800">Record Advance Deposit / Booking Fee Now</span>
+          </label>
+          <div id="mbAdvanceFields" class="grid grid-cols-2 gap-2 hidden pt-1">
+            <div>
+              <label class="block text-[11px] font-medium text-slate-600">Amount (LKR):</label>
+              <input type="number" id="mbAdvanceAmount" placeholder="25000" class="mt-1 w-full p-1.5 border border-slate-300 rounded-lg">
+            </div>
+            <div>
+              <label class="block text-[11px] font-medium text-slate-600">Payment Method:</label>
+              <select id="mbAdvanceMethod" class="mt-1 w-full p-1.5 border border-slate-300 rounded-lg">
+                <option>Cash (LKR)</option>
+                <option>Bank Transfer (Commercial / Sampath / HNB)</option>
+                <option>Credit/Debit Card Slip</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Notes -->
+        <div>
+          <label class="block font-medium text-slate-700">Notes / Delivery Instructions:</label>
+          <input type="text" id="mbNotes" placeholder="e.g. Airport delivery BIA, child car seat required" class="mt-1 w-full p-2 border border-slate-300 rounded-xl">
+        </div>
+
+        <div class="flex justify-end space-x-2 pt-3 border-t border-slate-100">
+          <button type="button" onclick="closeModal('modalManualEarlyBooking')" class="px-3.5 py-2 border border-slate-300 rounded-xl text-slate-600 font-medium">Cancel</button>
+          <button type="submit" class="px-5 py-2 bg-slate-900 text-white font-bold rounded-xl shadow-md">Schedule Reservation</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Booking & Reservation Details -->
+  <div id="modalBookingDetail" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-md w-full max-h-[90vh] overflow-y-auto p-6 shadow-2xl border border-slate-100">
+      <div class="flex items-center justify-between pb-3.5 border-b border-slate-200">
+        <div>
+          <h3 class="text-base font-bold text-slate-900" id="bdTitle">Reservation Details</h3>
+          <p class="text-xs text-slate-500 font-mono" id="bdCode">BK-2026-0043</p>
+        </div>
+        <button onclick="closeModal('modalBookingDetail')" class="text-slate-400 hover:text-slate-600 text-lg">✕</button>
+      </div>
+
+      <div class="mt-4 space-y-3.5 text-xs" id="bdBody">
+        <!-- Rendered dynamically -->
+      </div>
+    </div>
+  </div>
+  <div id="modalAddCost" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-200">
+        <h3 class="text-sm font-bold text-slate-900">Log Vehicle Expense & Service Bill</h3>
+        <button onclick="closeModal('modalAddCost')" class="text-slate-400 hover:text-slate-600">✕</button>
+      </div>
+      <form onsubmit="handleAddCost(event)" class="mt-4 space-y-3 text-xs">
+        <div>
+          <label class="block font-medium text-slate-700">Vehicle:</label>
+          <select id="acVehicle" class="mt-1 w-full p-2 border border-slate-300 rounded-lg">
+            <!-- Populated via JS -->
+          </select>
+        </div>
+        <div>
+          <label class="block font-medium text-slate-700">Expense Category:</label>
+          <select id="acCategory" class="mt-1 w-full p-2 border border-slate-300 rounded-lg">
+            <option>Routine Maintenance / Service</option>
+            <option>Mechanical Repair</option>
+            <option>Tire Replacement</option>
+            <option>Comprehensive Insurance Premium</option>
+            <option>Fuel & Lubricants</option>
+          </select>
+        </div>
+        <div>
+          <label class="block font-medium text-slate-700">Description:</label>
+          <input type="text" id="acTitle" required placeholder="e.g. Engine oil & brake pad replacement" class="mt-1 w-full p-2 border border-slate-300 rounded-lg">
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block font-medium text-slate-700">Cost (LKR):</label>
+            <input type="number" id="acAmount" required value="18500" class="mt-1 w-full p-2 border border-slate-300 rounded-lg">
+          </div>
+          <div>
+            <label class="block font-medium text-slate-700">Invoice / Workshop:</label>
+            <input type="text" id="acWorkshop" placeholder="Toyota Lanka / AutoCare" class="mt-1 w-full p-2 border border-slate-300 rounded-lg">
+          </div>
+        </div>
+        <div class="flex justify-end space-x-2 pt-3 border-t border-slate-100">
+          <button type="button" onclick="closeModal('modalAddCost')" class="px-3 py-1.5 border border-slate-300 rounded-lg text-slate-600">Cancel</button>
+          <button type="submit" class="px-4 py-1.5 bg-slate-900 text-white font-semibold rounded-lg">Save Expense</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- APPLICATION JAVASCRIPT & REACTIVE DEMO STORE -->
+  <script>
+    // INITIAL REALISTIC SRI LANKAN DATA STORE
+    const DEFAULT_DATA = {
+      currentUser: {
+        id: 'u-1',
+        name: 'Dinuka Silva',
+        email: 'admin@shenaly.lk',
+        role: 'ADMIN',
+        initials: 'DS'
+      },
+      vehicles: [
+        {
+          id: 'v-raize',
+          plateNumber: 'WP CBA-7706',
+          make: 'Toyota',
+          model: 'Raize SUV',
+          year: 2025,
+          fuelType: 'Petrol',
+          dailyRate: 22500,
+          deposit: 35000,
+          mileage: 18400,
+          status: 'Available',
+          thumbnail: 'https://shenalyrentacar.com/wp-content/uploads/2026/05/Toyota-Raize-2025.jpg',
+          currentRenter: null
+        },
+        {
+          id: 'v-yaris',
+          plateNumber: 'WP CBF-9201',
+          make: 'Toyota',
+          model: 'Yaris Hatchback',
+          year: 2025,
+          fuelType: 'Petrol',
+          dailyRate: 16500,
+          deposit: 30000,
+          mileage: 14200,
+          status: 'Rented',
+          thumbnail: 'https://shenalyrentacar.com/wp-content/uploads/2026/05/Toyota-Yaris-2025.jpg',
+          currentRenter: 'SR-0147'
+        },
+        {
+          id: 'v-vezel',
+          plateNumber: 'WP PE-1284',
+          make: 'Honda',
+          model: 'Vezel RS',
+          year: 2025,
+          fuelType: 'Petrol',
+          dailyRate: 24000,
+          deposit: 40000,
+          mileage: 29500,
+          status: 'Rented',
+          thumbnail: 'https://shenalyrentacar.com/wp-content/uploads/2026/05/Honda-vezel-2025.jpg',
+          currentRenter: 'SR-0146'
+        },
+        {
+          id: 'v-chr',
+          plateNumber: 'WP CAD-4920',
+          make: 'Toyota',
+          model: 'C-HR Sport SUV',
+          year: 2022,
+          fuelType: 'Hybrid',
+          dailyRate: 22500,
+          deposit: 35000,
+          mileage: 41800,
+          status: 'Available',
+          thumbnail: 'https://shenalyrentacar.com/wp-content/uploads/2026/05/WhatsApp-Image-2026-05-12-at-9.59.03-AM.jpeg',
+          currentRenter: null
+        },
+        {
+          id: 'v-premio',
+          plateNumber: 'WP KX-9312',
+          make: 'Toyota',
+          model: 'Premio Executive',
+          year: 2016,
+          fuelType: 'Petrol',
+          dailyRate: 18000,
+          deposit: 35000,
+          mileage: 78500,
+          status: 'In Service / Maintenance',
+          thumbnail: 'https://shenalyrentacar.com/wp-content/uploads/2026/05/Toyota-Premio-2016.jpg',
+          currentRenter: null
+        },
+        {
+          id: 'v-vitz',
+          plateNumber: 'WP CAH-4821',
+          make: 'Toyota',
+          model: 'Vitz Compact',
+          year: 2020,
+          fuelType: 'Petrol',
+          dailyRate: 13500,
+          deposit: 25000,
+          mileage: 52100,
+          status: 'Available',
+          thumbnail: 'https://shenalyrentacar.com/wp-content/uploads/2025/06/Toyota-Vitz-2020.jpg',
+          currentRenter: null
+        }
+      ],
+      renters: [
+        {
+          id: 'r-1',
+          profileId: 'SR-0146',
+          name: 'Nimal Perera',
+          phone: '+94 77 123 4567',
+          email: 'nimal.p@gmail.com',
+          isTourist: false,
+          country: 'Sri Lanka',
+          docs: ['National Identity Card (198812304561)', 'Sri Lanka Driving License (B3920194)'],
+          rentalsCount: 3
+        },
+        {
+          id: 'r-2',
+          profileId: 'SR-0147',
+          name: 'David Miller',
+          phone: '+44 7911 123456',
+          email: 'david.miller@uktravel.co.uk',
+          isTourist: true,
+          country: 'United Kingdom',
+          docs: ['UK Passport (GB9821034)', 'AA Ceylon IDP Permit', 'DMT Airport Permit (BIA-2026-491)'],
+          rentalsCount: 1
+        },
+        {
+          id: 'r-3',
+          profileId: 'SR-0148',
+          name: 'Kavindi Wickramasinghe',
+          phone: '+94 71 889 9234',
+          email: 'kavindi.w@dialog.lk',
+          isTourist: false,
+          country: 'Sri Lanka',
+          docs: ['National Identity Card (199578102391)', 'Sri Lanka Driving License (B4829103)'],
+          rentalsCount: 1
+        },
+        {
+          id: 'r-4',
+          profileId: 'SR-0149',
+          name: 'Sophie Taylor',
+          phone: '+44 7700 900123',
+          email: 'sophie.taylor@london.co.uk',
+          isTourist: true,
+          country: 'United Kingdom',
+          source: 'Self-Registered (Online)',
+          docs: ['UK Passport (GB94820129)', 'AA Ceylon IDP Permit (Pending Verification)'],
+          rentalsCount: 1
+        }
+      ],
+      rentals: [
+        {
+          id: 'rnt-1',
+          code: 'RNT-2026-0041',
+          vehiclePlate: 'WP CAH-4821',
+          renterId: 'SR-0146',
+          renterName: 'Nimal Perera',
+          days: 5,
+          dailyRate: 6500,
+          totalAmount: 32500,
+          deposit: 25000,
+          paidAmount: 32500,
+          status: 'Active',
+          startDate: '2026-10-01',
+          endDate: '2026-10-06',
+          pickupPhotos: { count: 6, timestamp: '2026-10-01 09:30 AM' },
+          dropPhotos: null
+        },
+        {
+          id: 'rnt-2',
+          code: 'RNT-2026-0042',
+          vehiclePlate: 'WP PE-1284',
+          renterId: 'SR-0147',
+          renterName: 'David Miller (Tourist)',
+          days: 7,
+          dailyRate: 18500,
+          totalAmount: 129500,
+          deposit: 40000,
+          paidAmount: 80000,
+          status: 'Active',
+          startDate: '2026-09-30',
+          endDate: '2026-10-07',
+          pickupPhotos: { count: 6, timestamp: '2026-09-30 02:15 PM' },
+          dropPhotos: null
+        },
+        {
+          id: 'rnt-3',
+          code: 'RNT-2026-0040',
+          vehiclePlate: 'WP KX-9312',
+          renterId: 'SR-0148',
+          renterName: 'Kavindi Wickramasinghe',
+          days: 3,
+          dailyRate: 14000,
+          totalAmount: 42000,
+          deposit: 35000,
+          paidAmount: 42000,
+          status: 'Completed',
+          startDate: '2026-09-25',
+          endDate: '2026-09-28',
+          pickupPhotos: { count: 6, timestamp: '2026-09-25 10:00 AM' },
+          dropPhotos: { count: 6, timestamp: '2026-09-28 05:45 PM' }
+        },
+        {
+          id: 'rnt-4',
+          code: 'BK-2026-0043',
+          vehiclePlate: 'WP CBA-7706',
+          renterId: 'SR-0149',
+          renterName: 'Sophie Taylor (Tourist)',
+          days: 6,
+          dailyRate: 22500,
+          totalAmount: 135000,
+          deposit: 35000,
+          paidAmount: 35000,
+          status: 'Reserved',
+          startDate: '2026-10-21',
+          endDate: '2026-10-27',
+          pickupPhotos: null,
+          dropPhotos: null,
+          bookingSource: 'Online Self-Registration',
+          notes: 'Flight UL 504 arrival at BIA. Baby car seat requested.'
+        }
+      ],
+      payments: [
+        {
+          receiptNo: 'RCPT-2026-0090',
+          date: '2026-10-01',
+          renterName: 'Nimal Perera',
+          rentalCode: 'RNT-2026-0041',
+          method: 'Cash (LKR)',
+          type: 'Rental Payment',
+          amount: 32500
+        },
+        {
+          receiptNo: 'RCPT-2026-0091',
+          date: '2026-09-30',
+          renterName: 'David Miller',
+          rentalCode: 'RNT-2026-0042',
+          method: 'Bank Transfer (Commercial Bank)',
+          type: 'Advance Deposit & Partial Rental',
+          amount: 80000
+        },
+        {
+          receiptNo: 'RCPT-2026-0089',
+          date: '2026-09-25',
+          renterName: 'Kavindi Wickramasinghe',
+          rentalCode: 'RNT-2026-0040',
+          method: 'Credit/Debit Card Slip',
+          type: 'Rental Payment',
+          amount: 42000
+        }
+      ],
+      costs: [
+        {
+          id: 'c-1',
+          date: '2026-09-20',
+          vehiclePlate: 'WP CAH-4821',
+          category: 'Routine Maintenance / Service',
+          title: '35,000 KM Mobil Super Engine Oil & Oil Filter',
+          workshop: 'Auto Mirage Moratuwa (INV-4921)',
+          amount: 14500,
+          hasBill: true
+        },
+        {
+          id: 'c-2',
+          date: '2026-09-28',
+          vehiclePlate: 'WP ND-5509',
+          category: 'Mechanical Repair',
+          title: 'Toyota KDH Injector Calibration & Fuel Filter',
+          workshop: 'Toyota Lanka Wattala (INV-98213)',
+          amount: 48000,
+          hasBill: true
+        },
+        {
+          id: 'c-3',
+          date: '2026-09-15',
+          vehiclePlate: 'WP PE-1284',
+          category: 'Comprehensive Insurance Premium',
+          title: 'Quarterly Commercial Hire Insurance (SLIC)',
+          workshop: 'Sri Lanka Insurance Corp',
+          amount: 32000,
+          hasBill: true
+        }
+      ]
+    };
+
+    // LOAD OR PERSIST STATE IN LOCALSTORAGE
+    function getStore() {
+      const stored = localStorage.getItem('shenaly_demo_store_v2');
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          if (parsed.vehicles && parsed.vehicles.some(v => v.id === 'v-raize')) {
+            return parsed;
+          }
+        } catch (e) { console.error(e); }
+      }
+      // Upgrade to fresh scraped fleet
+      localStorage.setItem('shenaly_demo_store_v2', JSON.stringify(DEFAULT_DATA));
+      return DEFAULT_DATA;
+    }
+
+    function saveStore(data) {
+      localStorage.setItem('shenaly_demo_store_v2', JSON.stringify(data));
+      refreshUI();
+    }
+
+    function resetDemoData() {
+      if (confirm('Reset demo data back to clean factory default state?')) {
+        localStorage.removeItem('shenaly_demo_store');
+        localStorage.removeItem('shenaly_demo_store_v2');
+        refreshUI();
+      }
+    }
+
+    function exportDataJson() {
+      const data = getStore();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `shenaly-demo-data-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    // DUMMY AUTHENTICATION HANDLERS
+    function switchUserRole(role) {
+      const store = getStore();
+      if (role === 'ADMIN') {
+        store.currentUser = {
+          id: 'u-1',
+          name: 'Dinuka Silva',
+          email: 'admin@shenaly.lk',
+          role: 'ADMIN',
+          initials: 'DS'
+        };
+      } else {
+        store.currentUser = {
+          id: 'u-2',
+          name: 'Kasun Fernando',
+          email: 'staff@shenaly.lk',
+          role: 'STAFF',
+          initials: 'KF'
+        };
+      }
+      saveStore(store);
+    }
+
+    // TAB SWITCHING
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        if (btn.getAttribute('data-tab') === tabId) {
+          btn.className = 'tab-btn active px-3.5 py-2 text-sm font-semibold rounded-lg bg-slate-900 text-white shadow-sm';
+        } else {
+          btn.className = 'tab-btn px-3.5 py-2 text-sm font-medium rounded-lg text-slate-600 hover:bg-slate-200';
+        }
+      });
+      document.querySelectorAll('.tab-content').forEach(section => {
+        section.classList.add('hidden');
+      });
+      const activeSection = document.getElementById('tab-' + tabId);
+      if (activeSection) activeSection.classList.remove('hidden');
+    }
+
+    // UI RENDERERS
+    function refreshUI() {
+      const data = getStore();
+      const role = data.currentUser.role;
+
+      // Update Auth UI
+      document.getElementById('userName').innerText = data.currentUser.name;
+      document.getElementById('userAvatar').innerText = data.currentUser.initials;
+      document.getElementById('userRoleBadge').innerText = role + ' ROLE';
+      document.getElementById('bannerRole').innerText = role === 'ADMIN' ? 'Administrator' : 'Staff Operations';
+      document.getElementById('bannerPermissions').innerText = role === 'ADMIN' 
+        ? 'Full privileges: view net profit margins, log expenses, and generate WhatsApp performance digests.' 
+        : 'Operations view: register renters, record drop/pickup inspection photos, and collect rental payments.';
+
+      if (role === 'ADMIN') {
+        document.getElementById('btnSwitchAdmin').className = 'px-2.5 py-1 rounded font-medium transition-colors bg-amber-500 text-slate-950 font-semibold shadow-sm';
+        document.getElementById('btnSwitchStaff').className = 'px-2.5 py-1 rounded font-medium transition-colors text-slate-300 hover:text-white';
+      } else {
+        document.getElementById('btnSwitchStaff').className = 'px-2.5 py-1 rounded font-medium transition-colors bg-amber-500 text-slate-950 font-semibold shadow-sm';
+        document.getElementById('btnSwitchAdmin').className = 'px-2.5 py-1 rounded font-medium transition-colors text-slate-300 hover:text-white';
+      }
+
+      // Counts in Tabs
+      document.getElementById('countVehicles').innerText = data.vehicles.length;
+      document.getElementById('countRenters').innerText = data.renters.length;
+      document.getElementById('countRentals').innerText = data.rentals.length;
+
+      const reservedCount = data.rentals.filter(r => r.status === 'Reserved').length;
+      const countResEl = document.getElementById('countReservations');
+      if (countResEl) countResEl.innerText = reservedCount;
+      const earlyBadge = document.getElementById('earlyReservationsBadge');
+      if (earlyBadge) earlyBadge.innerText = `${reservedCount} Early Booking${reservedCount === 1 ? '' : 's'}`;
+
+      // Render Dashboard
+      renderDashboard(data);
+      // Render Vehicles
+      renderVehicles(data);
+      // Render Renters
+      renderRenters(data);
+      // Render Rentals
+      renderRentals(data);
+      // Render Calendar & Early Bookings
+      renderCalendar(data);
+      // Render Payments
+      renderPayments(data);
+      // Render Costs
+      renderCosts(data);
+      // Update WhatsApp Preview
+      updateWhatsAppPreview();
+    }
+
+    function renderDashboard(data) {
+      const totalVehicles = data.vehicles.length;
+      const rentedVehicles = data.vehicles.filter(v => v.status === 'Rented').length;
+      const utilPct = totalVehicles ? Math.round((rentedVehicles / totalVehicles) * 100) : 0;
+      
+      document.getElementById('dashUtilization').innerText = `${utilPct}%`;
+      document.getElementById('dashRentedCount').innerText = `${rentedVehicles} Rented`;
+      document.getElementById('dashFleetBreakdown').innerText = `${totalVehicles} total vehicles in fleet`;
+
+      const activeRentals = data.rentals.filter(r => r.status === 'Active').length;
+      document.getElementById('dashActiveRentals').innerText = activeRentals;
+
+      // 7-day revenue
+      const totalRevenue = data.payments.reduce((acc, p) => acc + p.amount, 0);
+      document.getElementById('dashWeeklyRevenue').innerText = 'LKR ' + totalRevenue.toLocaleString();
+
+      // Total costs & net profit
+      const totalCosts = data.costs.reduce((acc, c) => acc + c.amount, 0);
+      const netProfit = totalRevenue - totalCosts;
+      document.getElementById('dashNetProfit').innerText = 'LKR ' + netProfit.toLocaleString();
+      document.getElementById('dashTotalCosts').innerText = `Costs: LKR ${totalCosts.toLocaleString()}`;
+
+      // Attention Items
+      const attentionList = document.getElementById('dashAttentionList');
+      attentionList.innerHTML = `
+        <div class="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+          <div class="flex items-center justify-between text-amber-900 font-bold">
+            <span>WP ND-5509 (KDH Van)</span>
+            <span class="text-[10px] bg-amber-200 px-1.5 py-0.5 rounded">Maintenance</span>
+          </div>
+          <p class="text-xs text-amber-700 mt-1">In workshop at Toyota Lanka for 90,000km service.</p>
+        </div>
+        <div class="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <div class="flex items-center justify-between text-blue-900 font-bold">
+            <span>David Miller (SR-0147)</span>
+            <span class="text-[10px] bg-blue-200 px-1.5 py-0.5 rounded">Drop Oct 07</span>
+          </div>
+          <p class="text-xs text-blue-700 mt-1">Due for return in 3 days. Renter photo link active.</p>
+        </div>
+      `;
+
+      // Profit Table Body
+      const profitTbody = document.getElementById('dashProfitTableBody');
+      profitTbody.innerHTML = '';
+      data.vehicles.forEach(v => {
+        // Calculate vehicle revenue from rentals of this plate
+        const vehicleRevenue = data.rentals
+          .filter(r => r.vehiclePlate === v.plateNumber)
+          .reduce((sum, r) => sum + r.totalAmount, 0);
+
+        // Calculate vehicle expenses
+        const vehicleCost = data.costs
+          .filter(c => c.vehiclePlate === v.plateNumber)
+          .reduce((sum, c) => sum + c.amount, 0);
+
+        const vNet = vehicleRevenue - vehicleCost;
+        const netClass = vNet >= 0 ? 'text-emerald-700 font-bold' : 'text-rose-600 font-bold';
+
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-50';
+        tr.innerHTML = `
+          <td class="py-2.5 font-medium text-slate-900">
+            <div>${v.plateNumber}</div>
+            <div class="text-[11px] text-slate-500">${v.make} ${v.model}</div>
+          </td>
+          <td class="py-2.5">
+            <span class="badge ${getStatusBadge(v.status)}">${v.status}</span>
+          </td>
+          <td class="py-2.5 text-right font-mono">LKR ${vehicleRevenue.toLocaleString()}</td>
+          <td class="py-2.5 text-right font-mono text-slate-600">LKR ${vehicleCost.toLocaleString()}</td>
+          <td class="py-2.5 text-right font-mono ${netClass}">LKR ${vNet.toLocaleString()}</td>
+        `;
+        profitTbody.appendChild(tr);
+      });
+    }
+
+    function getStatusBadge(status) {
+      if (status === 'Available') return 'bg-emerald-100 text-emerald-800';
+      if (status === 'Rented') return 'bg-blue-100 text-blue-800';
+      if (status === 'In Service / Maintenance') return 'bg-amber-100 text-amber-800';
+      return 'bg-slate-100 text-slate-800';
+    }
+
+    function renderVehicles(data) {
+      const grid = document.getElementById('vehiclesGrid');
+      grid.innerHTML = '';
+
+      data.vehicles.forEach(v => {
+        const vehicleRevenue = data.rentals
+          .filter(r => r.vehiclePlate === v.plateNumber)
+          .reduce((sum, r) => sum + r.totalAmount, 0);
+        const vehicleCost = data.costs
+          .filter(c => c.vehiclePlate === v.plateNumber)
+          .reduce((sum, c) => sum + c.amount, 0);
+        const netProfit = vehicleRevenue - vehicleCost;
+
+        const card = document.createElement('div');
+        card.className = 'bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between';
+        card.innerHTML = `
+          <div>
+            <div class="h-40 bg-slate-100 relative overflow-hidden">
+              <img src="${v.thumbnail}" alt="${v.make} ${v.model}" class="w-full h-full object-cover">
+              <div class="absolute top-3 right-3">
+                <span class="badge ${getStatusBadge(v.status)} shadow-sm">${v.status}</span>
+              </div>
+              <div class="absolute bottom-3 left-3 bg-slate-900/80 backdrop-blur-sm text-white px-2 py-0.5 rounded text-xs font-mono font-bold">
+                ${v.plateNumber}
+              </div>
+            </div>
+
+            <div class="p-4 space-y-3">
+              <div>
+                <h3 class="font-bold text-sm text-slate-900">${v.make} ${v.model} (${v.year})</h3>
+                <p class="text-xs text-slate-500">${v.fuelType} · ${(v.mileage || 0).toLocaleString()} KM</p>
+              </div>
+
+              <div class="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-slate-100">
+                <div>
+                  <span class="text-slate-500 block">Daily Rate:</span>
+                  <span class="font-bold text-slate-900 font-mono">LKR ${v.dailyRate.toLocaleString()}</span>
+                </div>
+                <div>
+                  <span class="text-slate-500 block">Net Profit:</span>
+                  <span class="font-bold ${netProfit >= 0 ? 'text-emerald-600' : 'text-rose-600'} font-mono">LKR ${netProfit.toLocaleString()}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="p-4 pt-0">
+            <button onclick="viewVehicleDetail('${v.id}')" class="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold rounded-lg transition-colors">
+              View Profile & Service Bills →
+            </button>
+          </div>
+        `;
+        grid.appendChild(card);
+      });
+    }
+
+    function viewVehicleDetail(vId) {
+      const data = getStore();
+      const v = data.vehicles.find(item => item.id === vId);
+      if (!v) return;
+
+      document.getElementById('mvdTitle').innerText = `${v.make} ${v.model} (${v.year})`;
+      document.getElementById('mvdPlate').innerText = `${v.plateNumber} · ${v.fuelType} · Daily Rate: LKR ${v.dailyRate.toLocaleString()}`;
+
+      // Calculate costs and service bills
+      const vehicleCosts = data.costs.filter(c => c.vehiclePlate === v.plateNumber);
+      const vehicleRentals = data.rentals.filter(r => r.vehiclePlate === v.plateNumber);
+      const totalRev = vehicleRentals.reduce((sum, r) => sum + r.totalAmount, 0);
+      const totalCost = vehicleCosts.reduce((sum, c) => sum + c.amount, 0);
+      const net = totalRev - totalCost;
+
+      const body = document.getElementById('mvdBody');
+      const uniqueRenters = Array.from(new Set(vehicleRentals.map(r => r.renterId))).length;
+      const totalKmByRenters = vehicleRentals.reduce((sum, r) => sum + (r.mileageDriven || 450), 0);
+      
+      // Calculate monthly fuel
+      const vehicleFuel = (data.fuelLogs || []).filter(f => f.vehiclePlate === v.plateNumber);
+      const totalFuelLiters = vehicleFuel.reduce((sum, f) => sum + f.liters, 0) || 35;
+      const totalFuelCost = vehicleFuel.reduce((sum, f) => sum + f.totalCost, 0) || (totalFuelLiters * 414);
+      
+      // Average monthly burn rate = (total maintenance + fuel) / 2 months
+      const monthlyBurnRate = Math.round((totalCost + totalFuelCost) / 2);
+
+      body.innerHTML = `
+        <!-- 5-Metric Quick Matrix -->
+        <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200 text-center text-xs">
+          <div>
+            <span class="text-slate-500 text-[10px] block font-bold">1. Renters Count</span>
+            <span class="font-bold text-slate-900 text-sm">${uniqueRenters} Clients</span>
+            <span class="text-[10px] text-slate-500">${vehicleRentals.length} Contracts</span>
+          </div>
+          <div>
+            <span class="text-slate-500 text-[10px] block font-bold">2. Total Odometer</span>
+            <span class="font-bold text-slate-900 text-sm">${v.mileage.toLocaleString()} KM</span>
+            <span class="text-[10px] text-emerald-700 font-bold">+${totalKmByRenters.toLocaleString()} KM driven</span>
+          </div>
+          <div>
+            <span class="text-slate-500 text-[10px] block font-bold">3. Total Services</span>
+            <span class="font-bold text-rose-600 text-sm">LKR ${totalCost.toLocaleString()}</span>
+            <span class="text-[10px] text-slate-500">${vehicleCosts.length} Invoices</span>
+          </div>
+          <div>
+            <span class="text-slate-500 text-[10px] block font-bold">4. Monthly Burn</span>
+            <span class="font-bold text-rose-700 text-sm">LKR ${monthlyBurnRate.toLocaleString()}</span>
+            <span class="text-[10px] text-slate-500">Service + Fuel</span>
+          </div>
+          <div>
+            <span class="text-slate-500 text-[10px] block font-bold">5. Monthly Fuel</span>
+            <span class="font-bold text-amber-600 text-sm">${totalFuelLiters} L</span>
+            <span class="text-[10px] text-slate-500">LKR ${totalFuelCost.toLocaleString()}</span>
+          </div>
+        </div>
+
+        <!-- Section 1: Renter History & Mileage Ledger -->
+        <div class="pt-2">
+          <div class="flex items-center justify-between mb-2">
+            <h4 class="font-bold text-slate-900 text-xs uppercase tracking-wide">1 & 2. Renter History & Mileage Breakdown</h4>
+            <span class="text-[11px] text-slate-500">Total driven by renters: <strong class="text-emerald-700">+${totalKmByRenters.toLocaleString()} KM</strong></span>
+          </div>
+          ${vehicleRentals.length === 0 ? '<p class="text-slate-400 italic">No rental history recorded for this plate.</p>' : `
+            <div class="border border-slate-200 rounded-lg overflow-hidden">
+              <table class="min-w-full divide-y divide-slate-200 text-xs">
+                <thead class="bg-slate-50 text-slate-600 text-[10px] uppercase font-bold">
+                  <tr>
+                    <th class="px-3 py-2 text-left">Contract</th>
+                    <th class="px-3 py-2 text-left">Renter Name & ID</th>
+                    <th class="px-3 py-2 text-left">Timeframe</th>
+                    <th class="px-3 py-2 text-right">Distance Driven</th>
+                    <th class="px-3 py-2 text-center">Status</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                  ${vehicleRentals.map(r => `
+                    <tr>
+                      <td class="px-3 py-2 font-mono font-bold text-slate-900">${r.code}</td>
+                      <td class="px-3 py-2">
+                        <div class="font-bold text-slate-900">${r.renterName}</div>
+                        <div class="text-[10px] text-slate-500 font-mono">${r.renterId}</div>
+                      </td>
+                      <td class="px-3 py-2 text-slate-600">${r.startDate} to ${r.endDate} (${r.days}d)</td>
+                      <td class="px-3 py-2 text-right font-bold text-emerald-700 font-mono">+${(r.mileageDriven || 540).toLocaleString()} KM</td>
+                      <td class="px-3 py-2 text-center">
+                        <span class="px-1.5 py-0.5 text-[9px] font-bold rounded ${r.status === 'Active' ? 'bg-blue-100 text-blue-800' : 'bg-emerald-100 text-emerald-800'}">${r.status}</span>
+                      </td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+          `}
+        </div>
+
+        <!-- Section 2: Services & Maintenance History + User Input -->
+        <div class="pt-3 border-t border-slate-200">
+          <div class="flex items-center justify-between mb-2">
+            <h4 class="font-bold text-slate-900 text-xs uppercase tracking-wide">3. Services & Maintenance History</h4>
+            <span class="text-[11px] font-bold text-rose-600">Total Spent: LKR ${totalCost.toLocaleString()}</span>
+          </div>
+
+          <!-- Input Form for new service -->
+          <div class="p-3 bg-amber-50/70 border border-amber-200 rounded-lg mb-3">
+            <div class="font-bold text-amber-900 text-xs mb-2">Log New Service / Maintenance for ${v.plateNumber}</div>
+            <form onsubmit="handleLogVehicleService(event, '${v.plateNumber}')" class="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+              <input type="text" id="msTitle" required placeholder="Service done (e.g. Oil change & brake pads)" class="p-2 border border-slate-300 rounded sm:col-span-2">
+              <select id="msCategory" class="p-2 border border-slate-300 rounded">
+                <option>Routine Maintenance / Service</option>
+                <option>Mechanical Repair</option>
+                <option>Tire Replacement</option>
+                <option>Commercial Insurance</option>
+              </select>
+              <input type="number" id="msAmount" required placeholder="Cost (LKR)" class="p-2 border border-slate-300 rounded">
+              <input type="text" id="msWorkshop" placeholder="Workshop (Toyota Lanka)" class="p-2 border border-slate-300 rounded">
+              <button type="submit" class="p-2 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded uppercase text-[11px]">Save Service</button>
+            </form>
+          </div>
+
+          <div class="space-y-1.5 max-h-40 overflow-y-auto">
+            ${vehicleCosts.length === 0 ? '<p class="text-slate-400 italic">No maintenance logged yet.</p>' : `
+              ${vehicleCosts.map(c => `
+                <div class="p-2.5 bg-white border border-slate-200 rounded-lg flex items-center justify-between">
+                  <div>
+                    <div class="font-semibold text-slate-900">${c.title}</div>
+                    <div class="text-[11px] text-slate-500">${c.date} · ${c.workshop} (${c.category})</div>
+                  </div>
+                  <div class="text-right">
+                    <span class="font-bold text-rose-600 font-mono">LKR ${c.amount.toLocaleString()}</span>
+                    <span class="block text-[10px] text-blue-600 font-medium">Verified Bill</span>
+                  </div>
+                </div>
+              `).join('')}
+            `}
+          </div>
+        </div>
+
+        <!-- Section 3: Monthly Fuel Consumption + User Input -->
+        <div class="pt-3 border-t border-slate-200">
+          <div class="flex items-center justify-between mb-2">
+            <h4 class="font-bold text-slate-900 text-xs uppercase tracking-wide">4 & 5. Monthly Fuel Consumption & Burn Rate</h4>
+            <span class="text-[11px] font-bold text-amber-700">Month Liters: ${totalFuelLiters} L (LKR ${totalFuelCost.toLocaleString()})</span>
+          </div>
+
+          <!-- Input Form for new fuel -->
+          <div class="p-3 bg-blue-50/70 border border-blue-200 rounded-lg mb-3">
+            <div class="font-bold text-blue-900 text-xs mb-2">Log Fuel Fill-Up for ${v.plateNumber}</div>
+            <form onsubmit="handleLogVehicleFuel(event, '${v.plateNumber}')" class="grid grid-cols-1 sm:grid-cols-4 gap-2 text-xs">
+              <input type="number" step="0.5" id="mfLiters" required placeholder="Liters (e.g. 35L)" class="p-2 border border-slate-300 rounded">
+              <input type="number" id="mfPrice" value="414" placeholder="Rs/L (414)" class="p-2 border border-slate-300 rounded">
+              <input type="text" id="mfStation" placeholder="Station (Ceypetco)" class="p-2 border border-slate-300 rounded">
+              <button type="submit" class="p-2 bg-blue-700 hover:bg-blue-800 text-white font-bold rounded uppercase text-[11px]">Save Fuel Log</button>
+            </form>
+          </div>
+        </div>
+      `;
+
+      openModal('modalVehicleDetail');
+    }
+
+    function renderRenters(data) {
+      const tbody = document.getElementById('rentersTableBody');
+      tbody.innerHTML = '';
+
+      data.renters.forEach(r => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-50';
+        tr.innerHTML = `
+          <td class="px-4 py-3 font-mono font-bold text-brand-700">
+            ${r.profileId}
+            ${r.source === 'Self-Registered (Online)' ? '<span class="block text-[10px] text-emerald-600 font-sans font-bold">🌐 Self-Reg</span>' : ''}
+          </td>
+          <td class="px-4 py-3">
+            <div class="font-semibold text-slate-900 flex items-center space-x-1.5">
+              <span>${r.name}</span>
+              ${r.source === 'Self-Registered (Online)' ? '<span class="bg-emerald-50 text-emerald-800 text-[10px] font-bold px-1.5 py-0.5 rounded border border-emerald-200">Online Link</span>' : ''}
+            </div>
+            <div class="text-slate-500">${r.phone}</div>
+          </td>
+          <td class="px-4 py-3">
+            <span class="badge ${r.isTourist ? 'bg-purple-100 text-purple-800' : 'bg-slate-100 text-slate-800'}">
+              ${r.isTourist ? 'Tourist (' + r.country + ')' : 'Sri Lankan Resident'}
+            </span>
+          </td>
+          <td class="px-4 py-3">
+            <div class="flex flex-wrap gap-1">
+              ${r.docs.map(d => `<span class="bg-emerald-50 text-emerald-700 text-[10px] px-1.5 py-0.5 rounded border border-emerald-200">✓ ${d}</span>`).join('')}
+            </div>
+          </td>
+          <td class="px-4 py-3 text-center font-bold text-slate-700">${r.rentalsCount}</td>
+          <td class="px-4 py-3 text-right">
+            <button onclick="alert('Viewing verified document scan for ${r.name}')" class="text-xs text-blue-600 hover:text-blue-800 font-semibold">
+              View Scans
+            </button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function renderRentals(data) {
+      const tbody = document.getElementById('rentalsTableBody');
+      tbody.innerHTML = '';
+
+      data.rentals.forEach(r => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-50';
+        tr.innerHTML = `
+          <td class="px-4 py-3 font-mono font-bold text-slate-900">
+            ${r.code}
+            ${r.bookingSource === 'Online Self-Registration' ? '<span class="block text-[10px] text-emerald-600 font-sans font-bold">🌐 Online</span>' : ''}
+          </td>
+          <td class="px-4 py-3 font-semibold text-slate-800 font-mono">${r.vehiclePlate}</td>
+          <td class="px-4 py-3">
+            <div class="font-medium text-slate-900">${r.renterName}</div>
+            <div class="text-[11px] text-slate-400 font-mono">${r.renterId}</div>
+          </td>
+          <td class="px-4 py-3">
+            <div>${r.startDate} to ${r.endDate}</div>
+            <div class="text-[11px] text-slate-500">${r.days} days @ LKR ${r.dailyRate.toLocaleString()}/day</div>
+          </td>
+          <td class="px-4 py-3 text-right font-mono font-bold text-slate-900">
+            LKR ${r.totalAmount.toLocaleString()}
+          </td>
+          <td class="px-4 py-3 text-center">
+            <button onclick="viewConditionPhotos('${r.id}')" class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded font-semibold text-[11px] border border-slate-300">
+              📷 ${r.pickupPhotos ? '6 Pickup Photos' : 'Pending'} ${r.dropPhotos ? '+ 6 Drop' : ''}
+            </button>
+          </td>
+          <td class="px-4 py-3 text-center">
+            <span class="badge ${r.status === 'Active' ? 'bg-blue-100 text-blue-800' : (r.status === 'Reserved' ? 'bg-amber-100 text-amber-900 border border-amber-300 font-bold' : 'bg-emerald-100 text-emerald-800')}">
+              ${r.status === 'Reserved' ? '🟡 Reserved' : r.status}
+            </span>
+          </td>
+          <td class="px-4 py-3 text-right space-x-1">
+            ${r.status === 'Active' ? `
+              <button onclick="markRentalReturned('${r.id}')" class="text-xs bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-1 rounded font-medium">
+                Mark Return
+              </button>
+            ` : (r.status === 'Reserved' ? `
+              <button onclick="checkInReservation('${r.id}')" class="text-xs bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1 rounded-lg font-bold shadow-xs">
+                🚀 Check-in (6 Photos)
+              </button>
+              <button onclick="openBookingDetail('${r.id}')" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-2 py-1 rounded-lg border border-slate-300 font-medium">
+                Details
+              </button>
+            ` : '<span class="text-xs text-slate-400 font-medium">Closed</span>')}
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function viewConditionPhotos(rId) {
+      const data = getStore();
+      const r = data.rentals.find(item => item.id === rId);
+      if (!r) return;
+
+      document.getElementById('mipTitle').innerText = `Condition Photos: ${r.code} (${r.vehiclePlate})`;
+      document.getElementById('mipSubtitle').innerText = `Renter: ${r.renterName} · Pickup Inspection: ${r.pickupPhotos ? r.pickupPhotos.timestamp : 'None'}`;
+
+      const grid = document.getElementById('mipGrid');
+      const angles = ['Front Angle', 'Rear Angle', 'Left Driver Side', 'Right Passenger Side', 'Interior & Seats', 'Odometer & Dashboard'];
+
+      grid.innerHTML = `
+        <div class="grid grid-cols-2 md:grid-cols-3 gap-3 text-xs">
+          ${angles.map((angle, idx) => `
+            <div class="border border-slate-200 rounded-xl overflow-hidden bg-slate-50">
+              <div class="h-28 bg-slate-800 relative flex items-center justify-center text-slate-400">
+                <svg class="w-8 h-8 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path></svg>
+                <span class="absolute bottom-1 right-2 text-[10px] text-white/80 bg-black/60 px-1 rounded">Angle #${idx + 1}</span>
+              </div>
+              <div class="p-2">
+                <div class="font-bold text-slate-900">${angle}</div>
+                <div class="text-[10px] text-emerald-700">✓ Pickup: Clean condition</div>
+                <div class="text-[10px] text-slate-500">${r.dropPhotos ? '✓ Drop: Returned no scratches' : 'Drop check pending'}</div>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      `;
+
+      openModal('modalInspectionPhotos');
+    }
+
+    function markRentalReturned(rId) {
+      const data = getStore();
+      const r = data.rentals.find(item => item.id === rId);
+      if (!r) return;
+
+      if (confirm(`Confirm vehicle return for ${r.vehiclePlate}? 6 return drop photos will be marked as submitted.`)) {
+        r.status = 'Completed';
+        r.dropPhotos = { count: 6, timestamp: new Date().toLocaleString() };
+
+        // Mark vehicle available
+        const v = data.vehicles.find(item => item.plateNumber === r.vehiclePlate);
+        if (v) {
+          v.status = 'Available';
+          v.currentRenter = null;
+        }
+
+        saveStore(data);
+      }
+    }
+
+    function renderPayments(data) {
+      const tbody = document.getElementById('paymentsTableBody');
+      tbody.innerHTML = '';
+
+      data.payments.forEach(p => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-50';
+        tr.innerHTML = `
+          <td class="px-4 py-3 font-mono font-bold text-slate-900">${p.receiptNo}</td>
+          <td class="px-4 py-3 text-slate-600">${p.date}</td>
+          <td class="px-4 py-3">
+            <div class="font-semibold text-slate-900">${p.renterName}</div>
+            <div class="text-[11px] text-slate-400 font-mono">${p.rentalCode}</div>
+          </td>
+          <td class="px-4 py-3">
+            <span class="badge bg-slate-100 text-slate-800 font-medium">${p.method}</span>
+          </td>
+          <td class="px-4 py-3 text-slate-600">${p.type}</td>
+          <td class="px-4 py-3 text-right font-mono font-bold text-emerald-700">
+            LKR ${p.amount.toLocaleString()}
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function renderCosts(data) {
+      const tbody = document.getElementById('costsTableBody');
+      tbody.innerHTML = '';
+
+      data.costs.forEach(c => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-50';
+        tr.innerHTML = `
+          <td class="px-4 py-3 text-slate-600">${c.date}</td>
+          <td class="px-4 py-3 font-mono font-bold text-slate-900">${c.vehiclePlate}</td>
+          <td class="px-4 py-3">
+            <div class="font-semibold text-slate-900">${c.title}</div>
+            <div class="text-[11px] text-slate-500">${c.category}</div>
+          </td>
+          <td class="px-4 py-3 text-slate-700">${c.workshop}</td>
+          <td class="px-4 py-3 text-center">
+            <span class="text-xs text-blue-600 font-medium cursor-pointer" onclick="alert('Viewing bill invoice for ${c.title}')">
+              📄 View Bill
+            </span>
+          </td>
+          <td class="px-4 py-3 text-right font-mono font-bold text-rose-600">
+            LKR ${c.amount.toLocaleString()}
+          </td>
+          <td class="px-4 py-3 text-right">
+            <button onclick="deleteCost('${c.id}')" class="text-slate-400 hover:text-rose-600 font-bold">✕</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function deleteCost(cId) {
+      const data = getStore();
+      if (data.currentUser.role !== 'ADMIN') {
+        alert('Only Admin users can delete or alter cost entries.');
+        return;
+      }
+      if (confirm('Delete this expense log?')) {
+        data.costs = data.costs.filter(item => item.id !== cId);
+        saveStore(data);
+      }
+    }
+
+    // WHATSAPP GENERATOR
+    function updateWhatsAppPreview() {
+      const data = getStore();
+      const today = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+      const activeRentals = data.rentals.filter(r => r.status === 'Active');
+      const totalRevenue = data.payments.reduce((acc, p) => acc + p.amount, 0);
+      const totalCosts = data.costs.reduce((acc, c) => acc + c.amount, 0);
+      const netProfit = totalRevenue - totalCosts;
+
+      const message = `*🚗 SHENALY RENT A CAR — WEEKLY FLEET REPORT*
+📅 *Week Ending:* ${today}
+🏢 *Office:* Colombo, Sri Lanka
+
+━━━━━━━━━━━━━━━━━━━━
+📊 *FLEET STATUS:*
+• Total Vehicles: ${data.vehicles.length}
+• Currently Rented: ${data.vehicles.filter(v => v.status === 'Rented').length}
+• Available for Booking: ${data.vehicles.filter(v => v.status === 'Available').length}
+• Under Service / Repair: ${data.vehicles.filter(v => v.status === 'In Service / Maintenance').length}
+
+💰 *7-DAY FINANCIALS:*
+• Revenue Collected: LKR ${totalRevenue.toLocaleString()}
+• Operational Costs: LKR ${totalCosts.toLocaleString()}
+• *Net Fleet Profit: LKR ${netProfit.toLocaleString()}*
+
+📋 *ACTIVE RENTALS (${activeRentals.length}):*
+${activeRentals.map(r => `• ${r.vehiclePlate} (${r.renterName}) — Due: ${r.endDate}`).join('\n')}
+
+⚠️ *ACTION ITEMS:*
+• WP ND-5509 (HiAce KDH): 90k service bill pending collection.
+• 1 foreign tourist rental active with DMT airport permit verified.
+
+━━━━━━━━━━━━━━━━━━━━
+_Automated via Shenaly Operations System_`;
+
+      document.getElementById('whatsappMessageContent').innerText = message;
+      
+      const recipient = document.getElementById('waRecipientInput')?.value || '+94771234567';
+      const cleanNumber = recipient.replace(/[^0-9]/g, '');
+      const encodedMsg = encodeURIComponent(message);
+      document.getElementById('btnSendWhatsApp').href = `https://wa.me/${cleanNumber}?text=${encodedMsg}`;
+    }
+
+    function copyWhatsAppData() {
+      const text = document.getElementById('whatsappMessageContent').innerText;
+      navigator.clipboard.writeText(text).then(() => {
+        alert('WhatsApp weekly summary copied to clipboard! You can paste it directly into WhatsApp.');
+      });
+    }
+
+    // MODAL HELPERS & FORM SUBMISSIONS
+    function openModal(id) {
+      document.getElementById(id).classList.remove('hidden');
+    }
+    function closeModal(id) {
+      document.getElementById(id).classList.add('hidden');
+    }
+
+    function openAddVehicleModal() { openModal('modalAddVehicle'); }
+    function handleAddVehicle(e) {
+      e.preventDefault();
+      const data = getStore();
+      const newV = {
+        id: 'v-' + Date.now(),
+        plateNumber: document.getElementById('avPlate').value.trim(),
+        make: document.getElementById('avMake').value.trim(),
+        model: document.getElementById('avModel').value.trim(),
+        year: parseInt(document.getElementById('avYear').value),
+        fuelType: document.getElementById('avFuel').value,
+        dailyRate: parseInt(document.getElementById('avDailyRate').value),
+        deposit: 25000,
+        mileage: 45000,
+        status: 'Available',
+        thumbnail: 'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?auto=format&fit=crop&w=400&q=80',
+        currentRenter: null
+      };
+      data.vehicles.push(newV);
+      saveStore(data);
+      closeModal('modalAddVehicle');
+      e.target.reset();
+    }
+
+    function openAddRenterModal() { openModal('modalAddRenter'); }
+    function handleAddRenter(e) {
+      e.preventDefault();
+      const data = getStore();
+      const nextIdNumber = 146 + data.renters.length;
+      const profileId = 'SR-0' + nextIdNumber;
+      const isTourist = document.getElementById('arType').value === 'tourist';
+      const docType = document.getElementById('arDocType').value;
+      const docNum = document.getElementById('arDocNumber').value;
+
+      const newR = {
+        id: 'r-' + Date.now(),
+        profileId: profileId,
+        name: document.getElementById('arName').value.trim(),
+        phone: document.getElementById('arPhone').value.trim(),
+        email: 'info@client.com',
+        isTourist: isTourist,
+        country: isTourist ? 'International' : 'Sri Lanka',
+        docs: [`${docType} (${docNum})`],
+        rentalsCount: 0
+      };
+
+      data.renters.push(newR);
+      saveStore(data);
+      closeModal('modalAddRenter');
+      e.target.reset();
+    }
+
+    function openCreateRentalModal() {
+      const data = getStore();
+      const vSelect = document.getElementById('crVehicle');
+      const rSelect = document.getElementById('crRenter');
+
+      vSelect.innerHTML = data.vehicles
+        .filter(v => v.status === 'Available')
+        .map(v => `<option value="${v.plateNumber}" data-rate="${v.dailyRate}">${v.plateNumber} — ${v.make} ${v.model} (LKR ${v.dailyRate}/day)</option>`)
+        .join('');
+
+      rSelect.innerHTML = data.renters
+        .map(r => `<option value="${r.profileId}">${r.profileId} — ${r.name} (${r.phone})</option>`)
+        .join('');
+
+      if (!vSelect.innerHTML) {
+        alert('No available vehicles right now. All vehicles are currently rented or in service.');
+        return;
+      }
+
+      calculateRentalTotal();
+      openModal('modalCreateRental');
+    }
+
+    function calculateRentalTotal() {
+      const vSelect = document.getElementById('crVehicle');
+      const selectedOption = vSelect.options[vSelect.selectedIndex];
+      const rate = selectedOption ? parseInt(selectedOption.getAttribute('data-rate')) : 0;
+      const days = parseInt(document.getElementById('crDays').value) || 1;
+      const total = rate * days;
+      document.getElementById('crCalculatedTotal').innerText = `LKR ${total.toLocaleString()}`;
+    }
+
+    function handleCreateRental(e) {
+      e.preventDefault();
+      const data = getStore();
+      const plate = document.getElementById('crVehicle').value;
+      const rId = document.getElementById('crRenter').value;
+      const days = parseInt(document.getElementById('crDays').value);
+      const deposit = parseInt(document.getElementById('crDeposit').value);
+
+      const vehicle = data.vehicles.find(v => v.plateNumber === plate);
+      const renter = data.renters.find(r => r.profileId === rId);
+
+      const totalAmount = vehicle.dailyRate * days;
+      const rentalCode = 'RNT-2026-00' + (40 + data.rentals.length + 1);
+
+      const newRental = {
+        id: 'rnt-' + Date.now(),
+        code: rentalCode,
+        vehiclePlate: plate,
+        renterId: rId,
+        renterName: renter.name,
+        days: days,
+        dailyRate: vehicle.dailyRate,
+        totalAmount: totalAmount,
+        deposit: deposit,
+        paidAmount: 0,
+        status: 'Active',
+        startDate: new Date().toISOString().slice(0, 10),
+        endDate: new Date(Date.now() + days * 86400000).toISOString().slice(0, 10),
+        pickupPhotos: { count: 6, timestamp: new Date().toLocaleString() },
+        dropPhotos: null
+      };
+
+      vehicle.status = 'Rented';
+      vehicle.currentRenter = rId;
+      renter.rentalsCount = (renter.rentalsCount || 0) + 1;
+
+      data.rentals.push(newRental);
+      saveStore(data);
+      closeModal('modalCreateRental');
+      e.target.reset();
+    }
+
+    function openRecordPaymentModal() {
+      const data = getStore();
+      const rSelect = document.getElementById('rpRental');
+      rSelect.innerHTML = data.rentals
+        .map(r => `<option value="${r.code}">${r.code} — ${r.renterName} (${r.vehiclePlate})</option>`)
+        .join('');
+
+      openModal('modalRecordPayment');
+    }
+
+    function handleRecordPayment(e) {
+      e.preventDefault();
+      const data = getStore();
+      const code = document.getElementById('rpRental').value;
+      const amount = parseInt(document.getElementById('rpAmount').value);
+      const method = document.getElementById('rpMethod').value;
+      const ref = document.getElementById('rpRef').value.trim() || 'Direct Slip';
+
+      const rental = data.rentals.find(r => r.code === code);
+      const receiptNo = 'RCPT-2026-00' + (90 + data.payments.length + 1);
+
+      const newPayment = {
+        receiptNo: receiptNo,
+        date: new Date().toISOString().slice(0, 10),
+        renterName: rental ? rental.renterName : 'Client',
+        rentalCode: code,
+        method: method,
+        type: 'Rental Payment',
+        amount: amount
+      };
+
+      if (rental) {
+        rental.paidAmount = (rental.paidAmount || 0) + amount;
+      }
+
+      data.payments.unshift(newPayment);
+      saveStore(data);
+      closeModal('modalRecordPayment');
+      e.target.reset();
+    }
+
+    function openAddCostModal() {
+      const data = getStore();
+      const vSelect = document.getElementById('acVehicle');
+      vSelect.innerHTML = data.vehicles
+        .map(v => `<option value="${v.plateNumber}">${v.plateNumber} — ${v.make} ${v.model}</option>`)
+        .join('');
+      openModal('modalAddCost');
+    }
+
+    function handleAddCost(e) {
+      e.preventDefault();
+      const data = getStore();
+      const newCost = {
+        id: 'c-' + Date.now(),
+        date: new Date().toISOString().slice(0, 10),
+        vehiclePlate: document.getElementById('acVehicle').value,
+        category: document.getElementById('acCategory').value,
+        title: document.getElementById('acTitle').value.trim(),
+        workshop: document.getElementById('acWorkshop').value.trim() || 'Auto Service Workshop',
+        amount: parseInt(document.getElementById('acAmount').value),
+        hasBill: true
+      };
+
+      data.costs.unshift(newCost);
+      saveStore(data);
+      closeModal('modalAddCost');
+      e.target.reset();
+    }
+
+    // ==========================================
+    // 📅 BOOKING CALENDAR & FLEET TIMELINE LOGIC
+    // ==========================================
+    let calCurrentYear = 2026;
+    let calCurrentMonth = 9; // October (0-indexed: 9 = Oct)
+
+    const MONTH_NAMES = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    const DAY_NAMES = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+
+    function navigateMonth(offset) {
+      if (offset === 0) {
+        calCurrentYear = 2026;
+        calCurrentMonth = 9;
+      } else {
+        calCurrentMonth += offset;
+        if (calCurrentMonth > 11) {
+          calCurrentMonth = 0;
+          calCurrentYear++;
+        } else if (calCurrentMonth < 0) {
+          calCurrentMonth = 11;
+          calCurrentYear--;
+        }
+      }
+      renderCalendar(getStore());
+    }
+
+    function renderCalendar(data) {
+      const label = document.getElementById('calCurrentMonthLabel');
+      if (label) {
+        label.innerText = `${MONTH_NAMES[calCurrentMonth]} ${calCurrentYear}`;
+      }
+
+      const daysInMonth = new Date(calCurrentYear, calCurrentMonth + 1, 0).getDate();
+      const container = document.getElementById('calendarMatrixContainer');
+      if (!container) return;
+
+      // Build Fleet Matrix Table
+      let html = `
+        <table class="min-w-full border-collapse text-xs select-none">
+          <thead>
+            <tr class="bg-slate-50 border-b border-slate-200">
+              <th class="sticky left-0 z-20 bg-slate-100/95 backdrop-blur-sm p-3 text-left font-bold text-slate-800 border-r border-slate-200 w-56 min-w-[220px]">
+                Vehicle / Fleet Details
+              </th>
+      `;
+
+      for (let day = 1; day <= daysInMonth; day++) {
+        const dObj = new Date(calCurrentYear, calCurrentMonth, day);
+        const dayOfWeek = DAY_NAMES[dObj.getDay()];
+        const isToday = (calCurrentYear === 2026 && calCurrentMonth === 9 && day === 17);
+        const isWeekend = (dObj.getDay() === 0 || dObj.getDay() === 6);
+
+        html += `
+          <th class="p-1.5 text-center border-r border-slate-200 w-10 min-w-[38px] ${isToday ? 'bg-amber-100/90 text-amber-950 font-black ring-1 ring-amber-400' : (isWeekend ? 'bg-slate-100/60 text-slate-600' : 'text-slate-700')}">
+            <div class="text-[10px] uppercase font-semibold text-slate-400">${dayOfWeek}</div>
+            <div class="text-xs font-bold">${day}</div>
+            ${isToday ? '<div class="text-[8px] bg-amber-500 text-slate-950 rounded px-0.5 font-bold uppercase mt-0.5">Today</div>' : ''}
+          </th>
+        `;
+      }
+
+      html += `
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-200">
+      `;
+
+      data.vehicles.forEach(v => {
+        html += `
+          <tr class="hover:bg-slate-50/50 transition-colors">
+            <!-- Sticky Vehicle Header Column -->
+            <td class="sticky left-0 z-10 bg-white/95 backdrop-blur-sm p-2.5 border-r border-slate-200 shadow-xs">
+              <div class="flex items-center space-x-2.5">
+                <img src="${v.thumbnail}" alt="${v.model}" class="w-10 h-8 rounded-lg object-cover border border-slate-200 flex-shrink-0">
+                <div class="min-w-0">
+                  <div class="font-bold text-slate-900 truncate font-mono text-[11px]">${v.plateNumber}</div>
+                  <div class="text-[10px] text-slate-500 truncate">${v.make} ${v.model}</div>
+                  <div class="text-[10px] text-brand-700 font-semibold font-mono">LKR ${v.dailyRate.toLocaleString()}/d</div>
+                </div>
+              </div>
+            </td>
+        `;
+
+        for (let day = 1; day <= daysInMonth; day++) {
+          const dateStr = `${calCurrentYear}-${String(calCurrentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+          
+          // Check if vehicle has an active rental or early reservation covering this date
+          const rental = data.rentals.find(r => 
+            r.vehiclePlate === v.plateNumber && 
+            r.startDate <= dateStr && 
+            r.endDate >= dateStr &&
+            r.status !== 'Cancelled'
+          );
+
+          const isMaintenance = (v.status === 'In Service / Maintenance');
+          const isToday = (calCurrentYear === 2026 && calCurrentMonth === 9 && day === 17);
+
+          if (rental) {
+            const isActive = (rental.status === 'Active');
+            const isReserved = (rental.status === 'Reserved');
+            const isStart = (rental.startDate === dateStr);
+            const isEnd = (rental.endDate === dateStr);
+
+            let bgClass = isActive 
+              ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-xs' 
+              : 'bg-amber-400 hover:bg-amber-500 text-slate-950 font-bold shadow-xs';
+
+            html += `
+              <td class="p-0.5 border-r border-slate-200 text-center relative group" onclick="openBookingDetail('${rental.id}')" title="${rental.code}: ${rental.renterName} (${rental.startDate} to ${rental.endDate})">
+                <div class="h-9 w-full ${bgClass} rounded-md flex flex-col items-center justify-center cursor-pointer transition-all p-0.5 text-[9px] leading-tight">
+                  <span class="truncate w-full font-mono font-bold">${isStart ? '▶' : ''} ${isStart ? rental.code.slice(-4) : (isEnd ? '■' : '●')}</span>
+                  ${isStart ? '<span class="text-[8px] truncate opacity-90">' + (isActive ? 'Active' : 'Early') + '</span>' : ''}
+                </div>
+              </td>
+            `;
+          } else if (isMaintenance) {
+            html += `
+              <td class="p-0.5 border-r border-slate-200 text-center" title="Vehicle In Service / Workshop">
+                <div class="h-9 w-full bg-rose-100 border border-rose-200 text-rose-700 rounded-md flex items-center justify-center text-[10px] font-bold">
+                  🔧
+                </div>
+              </td>
+            `;
+          } else {
+            // Free / Available date
+            html += `
+              <td class="p-0.5 border-r border-slate-200 text-center hover:bg-amber-50/50 cursor-pointer group" onclick="openManualBookingModal('${v.plateNumber}', '${dateStr}')" title="Available! Click to book ${v.plateNumber} on ${dateStr}">
+                <div class="h-9 w-full rounded-md flex items-center justify-center text-[10px] text-slate-200 group-hover:text-amber-700 group-hover:font-bold transition-colors">
+                  +
+                </div>
+              </td>
+            `;
+          }
+        }
+
+        html += `
+          </tr>
+        `;
+      });
+
+      html += `
+          </tbody>
+        </table>
+      `;
+
+      container.innerHTML = html;
+
+      // Render Early Reservations Table
+      const earlyTbody = document.getElementById('earlyReservationsTableBody');
+      if (earlyTbody) {
+        earlyTbody.innerHTML = '';
+        const reservedRentals = data.rentals.filter(r => r.status === 'Reserved');
+
+        if (reservedRentals.length === 0) {
+          earlyTbody.innerHTML = `
+            <tr>
+              <td colspan="8" class="text-center py-8 text-slate-400">
+                No early bookings scheduled. Click "+ Add Manual Early Booking" or share the Guest Front Link with customers.
+              </td>
+            </tr>
+          `;
+        } else {
+          reservedRentals.forEach(r => {
+            const tr = document.createElement('tr');
+            tr.className = 'hover:bg-slate-50 transition-colors';
+            tr.innerHTML = `
+              <td class="px-4 py-3 font-mono font-bold text-slate-900">
+                ${r.code}
+                <span class="block text-[10px] text-amber-700 font-sans font-semibold">🟡 Early Booking</span>
+              </td>
+              <td class="px-4 py-3">
+                <div class="font-bold text-slate-900 font-mono">${r.vehiclePlate}</div>
+                <div class="text-[11px] text-slate-500">${r.dailyRate.toLocaleString()} LKR/day</div>
+              </td>
+              <td class="px-4 py-3">
+                <div class="font-semibold text-slate-900">${r.renterName}</div>
+                <div class="text-[11px] text-slate-400 font-mono">${r.renterId}</div>
+              </td>
+              <td class="px-4 py-3">
+                <div class="font-medium text-slate-900">${r.startDate} to ${r.endDate}</div>
+                <div class="text-[11px] text-slate-500">${r.days} days reserved</div>
+              </td>
+              <td class="px-4 py-3 text-right font-mono font-bold text-slate-900">
+                LKR ${r.totalAmount.toLocaleString()}
+              </td>
+              <td class="px-4 py-3 text-center">
+                <span class="badge ${r.paidAmount > 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}">
+                  ${r.paidAmount > 0 ? 'LKR ' + r.paidAmount.toLocaleString() + ' Paid' : 'Pending'}
+                </span>
+              </td>
+              <td class="px-4 py-3 text-center">
+                <span class="badge ${r.bookingSource === 'Online Self-Registration' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-700'}">
+                  ${r.bookingSource === 'Online Self-Registration' ? '🌐 Guest Link' : '🏢 Staff Manual'}
+                </span>
+              </td>
+              <td class="px-4 py-3 text-right space-x-1 whitespace-nowrap">
+                <button onclick="checkInReservation('${r.id}')" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs shadow-xs transition-all">
+                  🚀 Check-in (6 Photos)
+                </button>
+                <button onclick="openBookingDetail('${r.id}')" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg border border-slate-300 font-medium text-xs">
+                  Details
+                </button>
+                <button onclick="cancelReservation('${r.id}')" class="px-2 py-1 text-rose-600 hover:text-rose-800 font-medium text-xs">
+                  Cancel
+                </button>
+              </td>
+            `;
+            earlyTbody.appendChild(tr);
+          });
+        }
+      }
+    }
+
+    // ==========================================
+    // ✍️ MANUAL EARLY BOOKING MODAL LOGIC (STAFF/ADMIN)
+    // ==========================================
+    function openManualBookingModal(preselectedPlate, preselectedDate) {
+      const data = getStore();
+      const vSelect = document.getElementById('mbVehicle');
+      const rSelect = document.getElementById('mbRenter');
+
+      // Populate Vehicles
+      vSelect.innerHTML = data.vehicles
+        .map(v => `<option value="${v.plateNumber}" data-rate="${v.dailyRate}" data-deposit="${v.deposit || 35000}" ${v.plateNumber === preselectedPlate ? 'selected' : ''}>
+          ${v.plateNumber} — ${v.make} ${v.model} (${v.status}) · LKR ${v.dailyRate}/d
+        </option>`)
+        .join('');
+
+      // Populate Renters
+      rSelect.innerHTML = data.renters
+        .map(r => `<option value="${r.profileId}">
+          ${r.profileId} — ${r.name} (${r.phone}) [${r.isTourist ? 'Tourist' : 'Resident'}]
+        </option>`)
+        .join('');
+
+      // Setup Dates
+      const startInput = document.getElementById('mbStartDate');
+      const endInput = document.getElementById('mbEndDate');
+
+      if (preselectedDate) {
+        startInput.value = preselectedDate;
+        const d = new Date(preselectedDate);
+        d.setDate(d.getDate() + 4);
+        endInput.value = d.toISOString().slice(0, 10);
+      } else {
+        const tomorrow = new Date(Date.now() + 86400000);
+        const inFiveDays = new Date(Date.now() + 5 * 86400000);
+        startInput.value = tomorrow.toISOString().slice(0, 10);
+        endInput.value = inFiveDays.toISOString().slice(0, 10);
+      }
+
+      handleManualBookingVehicleChange();
+      openModal('modalManualEarlyBooking');
+    }
+
+    function handleManualBookingVehicleChange() {
+      const vSelect = document.getElementById('mbVehicle');
+      const selected = vSelect.options[vSelect.selectedIndex];
+      if (selected) {
+        const rate = parseInt(selected.getAttribute('data-rate')) || 20000;
+        const deposit = parseInt(selected.getAttribute('data-deposit')) || 35000;
+        document.getElementById('mbDailyRate').value = rate;
+        document.getElementById('mbDeposit').value = deposit;
+      }
+      calculateManualBookingTotal();
+    }
+
+    function calculateManualBookingTotal() {
+      const startStr = document.getElementById('mbStartDate').value;
+      const endStr = document.getElementById('mbEndDate').value;
+      const rate = parseInt(document.getElementById('mbDailyRate').value) || 0;
+
+      if (startStr && endStr) {
+        const start = new Date(startStr);
+        const end = new Date(endStr);
+        const diffMs = end - start;
+        const days = Math.max(1, Math.round(diffMs / (1000 * 60 * 60 * 24)));
+        const total = days * rate;
+
+        document.getElementById('mbCalculatedDays').innerText = `${days} Day${days > 1 ? 's' : ''} (@ LKR ${rate.toLocaleString()}/day)`;
+        document.getElementById('mbCalculatedTotal').innerText = `LKR ${total.toLocaleString()}`;
+      }
+    }
+
+    function toggleAdvancePaymentFields() {
+      const chk = document.getElementById('mbCollectAdvance').checked;
+      const fields = document.getElementById('mbAdvanceFields');
+      if (chk) {
+        fields.classList.remove('hidden');
+      } else {
+        fields.classList.add('hidden');
+      }
+    }
+
+    function handleCreateManualBooking(e) {
+      e.preventDefault();
+      const data = getStore();
+
+      const plate = document.getElementById('mbVehicle').value;
+      const rId = document.getElementById('mbRenter').value;
+      const startDate = document.getElementById('mbStartDate').value;
+      const endDate = document.getElementById('mbEndDate').value;
+      const dailyRate = parseInt(document.getElementById('mbDailyRate').value);
+      const deposit = parseInt(document.getElementById('mbDeposit').value);
+      const notes = document.getElementById('mbNotes').value.trim();
+
+      if (new Date(endDate) <= new Date(startDate)) {
+        alert('Return date must be strictly after pickup date.');
+        return;
+      }
+
+      const vehicle = data.vehicles.find(v => v.plateNumber === plate);
+      const renter = data.renters.find(r => r.profileId === rId);
+
+      const days = Math.max(1, Math.round((new Date(endDate) - new Date(startDate)) / (1000 * 60 * 60 * 24)));
+      const totalAmount = days * dailyRate;
+      const bookingCode = 'BK-2026-00' + (44 + data.rentals.length);
+
+      let advancePaid = 0;
+      if (document.getElementById('mbCollectAdvance').checked) {
+        advancePaid = parseInt(document.getElementById('mbAdvanceAmount').value) || 0;
+        if (advancePaid > 0) {
+          const method = document.getElementById('mbAdvanceMethod').value;
+          const receiptNo = 'RCPT-2026-00' + (91 + data.payments.length);
+          data.payments.unshift({
+            receiptNo: receiptNo,
+            date: new Date().toISOString().slice(0, 10),
+            renterName: renter ? renter.name : 'Client',
+            rentalCode: bookingCode,
+            method: method,
+            type: 'Advance Security Deposit',
+            amount: advancePaid
+          });
+        }
+      }
+
+      const newReservation = {
+        id: 'rnt-' + Date.now(),
+        code: bookingCode,
+        vehiclePlate: plate,
+        renterId: rId,
+        renterName: renter ? renter.name : 'Client',
+        days: days,
+        dailyRate: dailyRate,
+        totalAmount: totalAmount,
+        deposit: deposit,
+        paidAmount: advancePaid,
+        status: 'Reserved',
+        startDate: startDate,
+        endDate: endDate,
+        pickupPhotos: null,
+        dropPhotos: null,
+        bookingSource: 'Manual Staff Booking',
+        notes: notes
+      };
+
+      data.rentals.push(newReservation);
+      saveStore(data);
+      closeModal('modalManualEarlyBooking');
+      e.target.reset();
+
+      // Switch to calendar tab to show new reservation
+      switchTab('calendar');
+      alert(`Early booking scheduled successfully! Reference: ${bookingCode}`);
+    }
+
+    // ==========================================
+    // 🌐 GUEST FRONT PORTAL & SELF-REGISTRATION (NO APP)
+    // ==========================================
+    let publicRegisteredRenter = null;
+
+    function openPublicPortal() {
+      const data = getStore();
+      goToPublicStep(1);
+
+      // Pre-fill tomorrow and 5 days
+      const tomorrow = new Date(Date.now() + 86400000);
+      const inFiveDays = new Date(Date.now() + 6 * 86400000);
+      document.getElementById('pubStartDate').value = tomorrow.toISOString().slice(0, 10);
+      document.getElementById('pubEndDate').value = inFiveDays.toISOString().slice(0, 10);
+
+      // Render Vehicle Selector Cards
+      const grid = document.getElementById('pubVehicleGrid');
+      grid.innerHTML = data.vehicles.map((v, idx) => `
+        <label class="cursor-pointer border-2 ${idx === 0 ? 'border-amber-500 bg-amber-50/40 ring-2 ring-amber-400' : 'border-slate-200 bg-white hover:border-slate-300'} rounded-2xl p-3 flex flex-col justify-between transition-all vehicle-radio-card">
+          <input type="radio" name="pubVehicleChoice" value="${v.plateNumber}" data-rate="${v.dailyRate}" data-deposit="${v.deposit || 35000}" data-model="${v.make} ${v.model}" ${idx === 0 ? 'checked' : ''} onchange="onPublicVehicleSelected(this)" class="hidden">
+          <div>
+            <div class="h-28 rounded-xl overflow-hidden bg-slate-100 mb-2 relative">
+              <img src="${v.thumbnail}" alt="${v.model}" class="w-full h-full object-cover">
+              <span class="absolute top-2 right-2 bg-slate-900/80 backdrop-blur-xs text-white px-2 py-0.5 rounded text-[10px] font-mono font-bold">${v.plateNumber}</span>
+            </div>
+            <h4 class="font-bold text-slate-900 text-xs">${v.make} ${v.model}</h4>
+            <p class="text-[10px] text-slate-500">${v.transmission || 'Auto'} · ${v.fuelType} · Comprehensive Cover</p>
+          </div>
+          <div class="pt-2 border-t border-slate-100 mt-2 flex items-center justify-between">
+            <span class="text-[10px] text-slate-500">Daily:</span>
+            <span class="font-mono font-extrabold text-slate-900 text-xs">LKR ${v.dailyRate.toLocaleString()}</span>
+          </div>
+        </label>
+      `).join('');
+
+      calculatePublicBookingTotal();
+      openModal('modalPublicPortal');
+    }
+
+    function onPublicVehicleSelected(radio) {
+      document.querySelectorAll('.vehicle-radio-card').forEach(c => {
+        c.className = 'cursor-pointer border-2 border-slate-200 bg-white hover:border-slate-300 rounded-2xl p-3 flex flex-col justify-between transition-all vehicle-radio-card';
+      });
+      radio.closest('.vehicle-radio-card').className = 'cursor-pointer border-2 border-amber-500 bg-amber-50/40 ring-2 ring-amber-400 rounded-2xl p-3 flex flex-col justify-between transition-all vehicle-radio-card';
+      calculatePublicBookingTotal();
+    }
+
+    function copyGuestPortalLink() {
+      const dummyUrl = 'https://shenalyrentacar.com/guest-portal/register';
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(dummyUrl);
+      }
+      alert('✓ Shareable guest registration & early booking link copied to clipboard!\n\nURL: ' + dummyUrl + '\n\nCustomers can open this link directly in Safari, Chrome or Edge with zero app download required.');
+    }
+
+    function togglePublicRenterType(type) {
+      const isTourist = (type === 'tourist');
+      document.getElementById('pubLocalDocsGroup').classList.toggle('hidden', isTourist);
+      document.getElementById('pubTouristDocsGroup').classList.toggle('hidden', !isTourist);
+      document.getElementById('pubCountryWrapper').classList.toggle('hidden', !isTourist);
+      document.getElementById('pubTouristStayWrapper').classList.toggle('hidden', !isTourist);
+
+      const labelLocal = document.getElementById('labelLocalRenter');
+      const labelTourist = document.getElementById('labelTouristRenter');
+
+      if (isTourist) {
+        labelTourist.className = 'cursor-pointer border-2 border-amber-500 bg-amber-50/40 p-3 rounded-2xl flex items-center space-x-2.5 transition-all';
+        labelLocal.className = 'cursor-pointer border-2 border-slate-200 bg-white p-3 rounded-2xl flex items-center space-x-2.5 transition-all';
+      } else {
+        labelLocal.className = 'cursor-pointer border-2 border-amber-500 bg-amber-50/40 p-3 rounded-2xl flex items-center space-x-2.5 transition-all';
+        labelTourist.className = 'cursor-pointer border-2 border-slate-200 bg-white p-3 rounded-2xl flex items-center space-x-2.5 transition-all';
+      }
+    }
+
+    function goToPublicStep(step) {
+      document.getElementById('portalStep1').classList.toggle('hidden', step !== 1);
+      document.getElementById('portalStep2').classList.toggle('hidden', step !== 2);
+      document.getElementById('portalStep3').classList.toggle('hidden', step !== 3);
+
+      const ind1 = document.getElementById('portalStepIndicator1');
+      const ind2 = document.getElementById('portalStepIndicator2');
+      const ind3 = document.getElementById('portalStepIndicator3');
+
+      ind1.className = step === 1 ? 'py-2 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 shadow-xs font-bold' : 'py-2 rounded-xl bg-slate-100 border border-slate-200 text-slate-500';
+      ind2.className = step === 2 ? 'py-2 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 shadow-xs font-bold' : 'py-2 rounded-xl bg-slate-100 border border-slate-200 text-slate-500';
+      ind3.className = step === 3 ? 'py-2 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 shadow-xs font-bold' : 'py-2 rounded-xl bg-slate-100 border border-slate-200 text-slate-500';
+    }
+
+    function handlePublicStep1(e) {
+      e.preventDefault();
+      const isTourist = document.querySelector('input[name="pubRenterType"]:checked').value === 'tourist';
+      const name = document.getElementById('pubName').value.trim();
+      const phone = document.getElementById('pubPhone').value.trim();
+      const email = document.getElementById('pubEmail').value.trim();
+      const country = isTourist ? (document.getElementById('pubCountry').value.trim() || 'International') : 'Sri Lanka';
+      
+      let docs = [];
+      if (isTourist) {
+        const pass = document.getElementById('pubPassportNumber').value.trim() || 'Passport Attached';
+        const permit = document.getElementById('pubPermitType').value;
+        docs.push(`Passport (${pass})`);
+        docs.push(permit);
+      } else {
+        const nic = document.getElementById('pubNicNumber').value.trim() || 'NIC Attached';
+        const dl = document.getElementById('pubDlNumber').value.trim() || 'DL Attached';
+        docs.push(`National Identity Card (${nic})`);
+        docs.push(`Sri Lanka Driving License (${dl})`);
+      }
+
+      publicRegisteredRenter = {
+        name: name,
+        phone: phone,
+        email: email,
+        isTourist: isTourist,
+        country: country,
+        docs: docs
+      };
+
+      document.getElementById('pubReadyGuestName').innerText = `${name} (${phone}) · ${country}`;
+      goToPublicStep(2);
+      calculatePublicBookingTotal();
+    }
+
+    function calculatePublicBookingTotal() {
+      const startStr = document.getElementById('pubStartDate').value;
+      const endStr = document.getElementById('pubEndDate').value;
+      const selectedRadio = document.querySelector('input[name="pubVehicleChoice"]:checked');
+
+      if (!startStr || !endStr || !selectedRadio) return;
+
+      const rate = parseInt(selectedRadio.getAttribute('data-rate')) || 22500;
+      const deposit = parseInt(selectedRadio.getAttribute('data-deposit')) || 35000;
+
+      const start = new Date(startStr);
+      const end = new Date(endStr);
+      const diffMs = end - start;
+      const days = Math.max(1, Math.round(diffMs / (1000 * 60 * 60 * 24)));
+      const total = days * rate;
+
+      document.getElementById('pubDurationBadge').innerText = `${days} Day${days > 1 ? 's' : ''}`;
+      document.getElementById('pubTotalRentalLKR').innerText = `LKR ${total.toLocaleString()}`;
+      document.getElementById('pubDepositLKR').innerText = `LKR ${deposit.toLocaleString()}`;
+    }
+
+    function handlePublicStep2(e) {
+      e.preventDefault();
+      const data = getStore();
+
+      if (!publicRegisteredRenter) {
+        goToPublicStep(1);
+        return;
+      }
+
+      const selectedRadio = document.querySelector('input[name="pubVehicleChoice"]:checked');
+      const plate = selectedRadio.value;
+      const model = selectedRadio.getAttribute('data-model');
+      const rate = parseInt(selectedRadio.getAttribute('data-rate'));
+      const deposit = parseInt(selectedRadio.getAttribute('data-deposit'));
+
+      const startDate = document.getElementById('pubStartDate').value;
+      const endDate = document.getElementById('pubEndDate').value;
+      const flightInfo = document.getElementById('pubFlightInfo').value.trim();
+      const specialNotes = document.getElementById('pubSpecialNotes').value.trim();
+
+      const days = Math.max(1, Math.round((new Date(endDate) - new Date(startDate)) / (1000 * 60 * 60 * 24)));
+      const totalAmount = days * rate;
+
+      // 1. Generate Renter Profile ID
+      const profileId = 'SR-01' + (50 + data.renters.length);
+      const newRenter = {
+        id: 'r-' + Date.now(),
+        profileId: profileId,
+        name: publicRegisteredRenter.name,
+        phone: publicRegisteredRenter.phone,
+        email: publicRegisteredRenter.email,
+        isTourist: publicRegisteredRenter.isTourist,
+        country: publicRegisteredRenter.country,
+        source: 'Self-Registered (Online)',
+        docs: publicRegisteredRenter.docs,
+        rentalsCount: 1
+      };
+      data.renters.push(newRenter);
+
+      // 2. Generate Booking Reference
+      const bookingCode = 'BK-2026-00' + (45 + data.rentals.length);
+      const newReservation = {
+        id: 'rnt-' + Date.now(),
+        code: bookingCode,
+        vehiclePlate: plate,
+        renterId: profileId,
+        renterName: publicRegisteredRenter.name + (publicRegisteredRenter.isTourist ? ' (Tourist)' : ''),
+        days: days,
+        dailyRate: rate,
+        totalAmount: totalAmount,
+        deposit: deposit,
+        paidAmount: 0,
+        status: 'Reserved',
+        startDate: startDate,
+        endDate: endDate,
+        pickupPhotos: null,
+        dropPhotos: null,
+        bookingSource: 'Online Self-Registration',
+        notes: [flightInfo, specialNotes].filter(Boolean).join(' · ')
+      };
+      data.rentals.push(newReservation);
+      saveStore(data);
+
+      // 3. Fill Voucher Card
+      document.getElementById('vouchProfileId').innerText = profileId;
+      document.getElementById('vouchBookingCode').innerText = bookingCode;
+      document.getElementById('vouchName').innerText = publicRegisteredRenter.name;
+      document.getElementById('vouchPhone').innerText = publicRegisteredRenter.phone;
+      document.getElementById('vouchVehicle').innerText = model;
+      document.getElementById('vouchPlate').innerText = plate;
+      document.getElementById('vouchDates').innerText = `${startDate} to ${endDate} (${days} Days)`;
+      document.getElementById('vouchTotal').innerText = `LKR ${totalAmount.toLocaleString()}`;
+      document.getElementById('vouchDeposit').innerText = `LKR ${deposit.toLocaleString()}`;
+
+      // 4. WhatsApp Connect Link
+      const waMessage = encodeURIComponent(
+        `Hello Shenaly Rent a Car! 👋\n` +
+        `I have registered online and reserved a car:\n\n` +
+        `• Booking Ref: ${bookingCode}\n` +
+        `• Renter Profile ID: ${profileId}\n` +
+        `• Name: ${publicRegisteredRenter.name}\n` +
+        `• Vehicle: ${model} (${plate})\n` +
+        `• Dates: ${startDate} to ${endDate} (${days} Days)\n` +
+        `• Total: LKR ${totalAmount.toLocaleString()}\n` +
+        `• Security Deposit: LKR ${deposit.toLocaleString()}\n\n` +
+        `Please confirm my early booking and handover details. Thank you!`
+      );
+      document.getElementById('vouchWhatsAppBtn').href = `https://wa.me/94771234567?text=${waMessage}`;
+
+      // Move to Step 3 Confirmation
+      goToPublicStep(3);
+    }
+
+    function finishPublicPortal() {
+      closeModal('modalPublicPortal');
+      switchTab('calendar');
+    }
+
+    // ==========================================
+    // 🔍 RESERVATION DETAIL, CHECK-IN & CANCEL
+    // ==========================================
+    function openBookingDetail(rId) {
+      const data = getStore();
+      const r = data.rentals.find(item => item.id === rId || item.code === rId);
+      if (!r) return;
+
+      document.getElementById('bdTitle').innerText = r.status === 'Reserved' ? 'Early Reservation Details' : 'Active Rental Details';
+      document.getElementById('bdCode').innerText = r.code;
+
+      const body = document.getElementById('bdBody');
+      body.innerHTML = `
+        <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-slate-500">Status:</span>
+            <span class="badge ${r.status === 'Active' ? 'bg-blue-100 text-blue-800' : (r.status === 'Reserved' ? 'bg-amber-100 text-amber-900 font-bold border border-amber-300' : 'bg-emerald-100 text-emerald-800')}">
+              ${r.status}
+            </span>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-slate-500">Booking Source:</span>
+            <span class="font-semibold text-slate-800">${r.bookingSource || 'Direct Counter'}</span>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2 text-slate-700">
+          <div>
+            <span class="text-slate-400 text-[10px] block">Renter Name:</span>
+            <span class="font-bold text-slate-900">${r.renterName}</span>
+            <span class="text-[11px] text-slate-500 block font-mono">${r.renterId}</span>
+          </div>
+          <div>
+            <span class="text-slate-400 text-[10px] block">Vehicle:</span>
+            <span class="font-mono font-bold text-slate-900">${r.vehiclePlate}</span>
+            <span class="text-[11px] text-slate-500 block">LKR ${r.dailyRate.toLocaleString()}/day</span>
+          </div>
+        </div>
+
+        <div class="pt-2 border-t border-slate-200">
+          <span class="text-slate-400 text-[10px] block">Dates & Duration:</span>
+          <span class="font-semibold text-slate-800">${r.startDate} to ${r.endDate} (${r.days} Days)</span>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2 pt-2 border-t border-slate-200">
+          <div>
+            <span class="text-slate-400 text-[10px] block">Total Rental Amount:</span>
+            <span class="font-mono font-bold text-brand-700">LKR ${r.totalAmount.toLocaleString()}</span>
+          </div>
+          <div>
+            <span class="text-slate-400 text-[10px] block">Security Deposit:</span>
+            <span class="font-mono font-bold text-slate-900">LKR ${r.deposit.toLocaleString()}</span>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between pt-2 border-t border-slate-200">
+          <span class="text-slate-600 font-medium">Advance / Paid Amount:</span>
+          <span class="font-mono font-bold ${r.paidAmount > 0 ? 'text-emerald-700' : 'text-slate-500'}">
+            LKR ${(r.paidAmount || 0).toLocaleString()}
+          </span>
+        </div>
+
+        ${r.notes ? `
+          <div class="p-2.5 bg-amber-50 rounded-xl border border-amber-200 text-amber-900 text-[11px]">
+            <span class="font-bold block">Notes:</span>
+            ${r.notes}
+          </div>
+        ` : ''}
+
+        <div class="flex flex-col gap-2 pt-3 border-t border-slate-200">
+          ${r.status === 'Reserved' ? `
+            <button onclick="closeModal('modalBookingDetail'); checkInReservation('${r.id}')" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold flex items-center justify-center space-x-1.5 shadow-md">
+              <span>🚀 Check-in & Handover (6 Pickup Photos)</span>
+            </button>
+            <button onclick="closeModal('modalBookingDetail'); openRecordPaymentModal('${r.code}')" class="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl font-semibold border border-slate-300">
+              💳 Record Advance Payment / Deposit
+            </button>
+            <button onclick="closeModal('modalBookingDetail'); cancelReservation('${r.id}')" class="w-full py-1.5 text-rose-600 hover:text-rose-800 text-[11px] font-semibold">
+              Cancel Reservation
+            </button>
+          ` : (r.status === 'Active' ? `
+            <button onclick="closeModal('modalBookingDetail'); viewConditionPhotos('${r.id}')" class="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold">
+              📷 View 6 Handover Photos
+            </button>
+            <button onclick="closeModal('modalBookingDetail'); markRentalReturned('${r.id}')" class="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold">
+              Mark Vehicle Returned
+            </button>
+          ` : `
+            <div class="text-center text-slate-400 font-medium py-1">Contract Closed</div>
+          `)}
+        </div>
+      `;
+
+      openModal('modalBookingDetail');
+    }
+
+    function checkInReservation(rId) {
+      const data = getStore();
+      const r = data.rentals.find(item => item.id === rId);
+      if (!r) return;
+
+      if (confirm(`Check-in & Handover for ${r.renterName} (${r.vehiclePlate})?\n\nThis will record the 6-point pickup inspection photos and mark the vehicle as RENTED.`)) {
+        r.status = 'Active';
+        r.pickupPhotos = {
+          count: 6,
+          timestamp: new Date().toLocaleString()
+        };
+
+        const vehicle = data.vehicles.find(v => v.plateNumber === r.vehiclePlate);
+        if (vehicle) {
+          vehicle.status = 'Rented';
+          vehicle.currentRenter = r.renterId;
+        }
+
+        saveStore(data);
+        alert(`✓ Vehicle ${r.vehiclePlate} checked out successfully!\nPickup condition photos recorded in the inspection ledger.`);
+        viewConditionPhotos(r.id);
+      }
+    }
+
+    function cancelReservation(rId) {
+      const data = getStore();
+      const r = data.rentals.find(item => item.id === rId);
+      if (!r) return;
+
+      if (confirm(`Are you sure you want to cancel reservation ${r.code} for ${r.renterName}?`)) {
+        data.rentals = data.rentals.filter(item => item.id !== rId);
+        saveStore(data);
+        alert(`Reservation ${r.code} cancelled.`);
+      }
+    }
+
+    // INITIALIZE APP
+    window.addEventListener('DOMContentLoaded', () => {
+      refreshUI();
+
+      // Check URL parameters for direct guest portal linking (e.g. ?view=register)
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('view') === 'register' || urlParams.get('mode') === 'guest') {
+        openPublicPortal();
+      } else if (urlParams.get('view') === 'calendar') {
+        switchTab('calendar');
+      }
+    });
+  </script>
+</body>
+</html>
