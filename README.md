@@ -1,0 +1,62 @@
+# Tenant app
+
+The app a rental company works in every day: fleet, renters, bookings and hand-overs, payments, running costs, the dashboard and the WhatsApp digest, plus team and role management. Each company (tenant) signs in to its own workspace; Shenaly Rent a Car is tenant #1.
+
+Next.js 16 (App Router) · React 19 · TypeScript · Tailwind CSS 4 · Clerk · TanStack Query.
+
+## Run locally
+
+```sh
+npm install
+cp .env.example .env.local   # Clerk keys and the backend's tenant API URL
+npm run dev                  # http://localhost:3000
+```
+
+It needs the backend running (`npm run dev` in `backend/`, port 5000), with `http://localhost:3000` in its `CLERK_AUTHORIZED_PARTIES`.
+
+To sign in you need a member account in a provisioned tenant:
+
+1. A super admin creates the tenant in the admin dashboard, which invites its Owner by email. More users are invited from the tenant's **Users** page there, or by the Owner from this app's Team page.
+2. The invitation link opens this app's `/sign-up` (set the backend's `CLERK_INVITATION_REDIRECT_URL` to `http://localhost:3000/sign-up`).
+3. The backend adds the member when Clerk's webhook arrives; locally, `npm run seed -- --tenant <slug> --user <user_id> --email <email>` in the backend does it by hand.
+
+See the backend repo's `docs/clerk-setup.md`, steps 7 and 8.
+
+Checks: `npm run typecheck`, `npm run lint`, `npm run build`.
+
+## How it works
+
+- **Auth.** `src/proxy.ts` (Clerk) requires a session for everything but `/sign-in` and `/sign-up`. Personal accounts are off in Clerk, so a session is only active once the user picks one of their organizations; Clerk's sign-in shows that step. The organization is the tenant.
+- **Data.** Pages call the backend's `/api/v1` from the browser with the Clerk session token (`src/lib/api.ts`), through TanStack Query hooks (`src/lib/queries.ts`). Query keys start with the active organization id, so switching workspace never shows another tenant's cache.
+- **Workspace.** `src/components/shell/workspace-gate.tsx` loads `GET /me` (the member, role and effective permissions) and `GET /config` (the tenant's config) before anything renders, and explains what's wrong when that fails (not a member yet, workspace suspended, backend down).
+- **Config-driven UI.** `useWorkspace()` (`src/lib/workspace.tsx`) gives every page:
+  - `can(permission)` to hide what the role can't use;
+  - `moduleOn(module)` for modules the super admin switched off;
+  - `label(list, key)` and `options(list)` for the config's lists (payment methods, cost categories, document types);
+  - locale formatters for currency, dates in the tenant's timezone, and distances;
+  - the tenant's branding, set as the `--brand` CSS colour.
+
+  The tabs follow the config's `navigation` order and labels (`src/lib/navigation.ts`).
+- **The backend decides.** Hiding UI is never the protection. The API checks every permission and module again, validates every form, and strips profit and margin figures for roles without `financials:view`, so pages render what comes back. Form errors show the backend's field issues.
+
+## Layout
+
+| Path | Purpose |
+|---|---|
+| `src/proxy.ts` | Clerk session check |
+| `src/app/sign-in`, `src/app/sign-up` | Clerk sign-in, and invitation acceptance |
+| `src/app/(app)/` | The signed-in pages: `dashboard`, `vehicles`, `renters`, `rentals`, `calendar`, `payments`, `costs`, `whatsapp`, `team` |
+| `src/components/shell/` | Workspace gate, header and tabs, organization switcher, per-page module gate |
+| `src/components/ops/` | Forms and dialogs shared by pages: booking, rental details, payments, vehicles, costs and fuel, renters |
+| `src/components/ui/` | Buttons, dialogs, form fields, tables, badges |
+| `src/lib/contract.ts` | TypeScript types for the backend's responses, written by hand. Keep them in step with `backend/src/tenant/presenters.js` |
+| `src/lib/` | API client, query hooks, workspace context, formatters, dates, navigation |
+| `docs/` | Product scope and client research |
+
+## Not yet
+
+These come with Phase 5 (see the backend's `docs/development-roadmap.md`):
+
+- photo and document uploads (inspection photos, ID scans, service bills);
+- the public guest booking page at `/book/<slug>`;
+- sending the WhatsApp digest on its schedule. Today it's previewed and opened in WhatsApp by hand.
