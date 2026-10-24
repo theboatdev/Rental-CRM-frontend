@@ -121,12 +121,12 @@ function Members() {
                           variant="ghost"
                           disabled={remove.isPending}
                           onClick={() => {
-                            if (confirm(`Remove ${m.name ?? m.email} from the workspace? They lose access straight away.`)) {
+                            if (confirm(`Remove ${m.name ?? m.email} from this workspace? They lose access straight away. Their account isn't deleted, so they can be invited again.`)) {
                               remove.mutate(m, { onSuccess: () => toast.success(`${m.name ?? m.email} removed`) });
                             }
                           }}
                         >
-                          <UserMinus size={12} /> Remove
+                          <UserMinus size={12} /> Remove from workspace
                         </Button>
                       </td>
                     )}
