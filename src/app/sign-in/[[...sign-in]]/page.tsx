@@ -11,13 +11,13 @@ export const metadata: Metadata = { title: "Sign in" };
  */
 export default function SignInPage() {
   return (
-    <main className="swiss-grid-bg flex min-h-svh flex-col items-center justify-center gap-6 p-4">
-      <div className="text-center">
-        <p className="font-mono text-[10px] font-bold tracking-widest text-brand uppercase">Fleet operations</p>
-        <h1 className="mt-1 text-xl font-black tracking-tight">Sign in to your company&apos;s workspace</h1>
+    <main className="flex min-h-svh flex-col items-center justify-center gap-6 p-4">
+      <div className="max-w-sm text-center">
+        <p className="font-sans text-xs font-semibold tracking-normal text-muted">Fleet operations</p>
+        <h1 className="mt-2 text-2xl font-semibold tracking-tight">Sign in to your company&apos;s workspace</h1>
       </div>
       {/* SignIn reads the pathname of this catch-all route, which is request data. */}
-      <Suspense fallback={<div className="h-[420px] w-full max-w-[400px] animate-pulse bg-ink/5" />}>
+      <Suspense fallback={<div className="h-[420px] w-full max-w-[400px] animate-pulse rounded-lg bg-ink/5" />}>
         <SignIn />
       </Suspense>
     </main>

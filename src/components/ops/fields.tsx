@@ -119,9 +119,9 @@ export function CustomFieldInputs({
       return (
         <div key={field.key} className="col-span-full">
           <Checkbox label={field.required ? `${field.label} (required)` : field.label} checked={value === true} onChange={(checked) => set(field.key, checked)} />
-          {hint && !error && <p className="mt-1 text-[10px] text-muted">{hint}</p>}
+          {hint && !error && <p className="mt-1 text-xs text-muted">{hint}</p>}
           {error && (
-            <p role="alert" className="mt-1 text-[10px] font-bold text-rose-700">
+            <p role="alert" className="mt-1 text-xs font-semibold text-rose-700">
               {error}
             </p>
           )}
@@ -208,7 +208,7 @@ export function CustomFieldList({ section, values }: { section: FieldSection; va
   const fields = useCustomFields(section).filter((field) => values[field.key] !== undefined && values[field.key] !== "");
   return fields.map((field) => (
     <div key={field.key}>
-      <dt className="text-[10px] font-bold tracking-wider text-muted uppercase">{field.label}</dt>
+      <dt className="text-xs font-semibold tracking-normal text-muted">{field.label}</dt>
       <dd className={`text-ink ${field.type === "longText" ? "whitespace-pre-line" : ""}`}>{formatCustomValue(field, values[field.key], format)}</dd>
     </div>
   ));

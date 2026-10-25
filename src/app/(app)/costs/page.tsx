@@ -31,7 +31,7 @@ function Costs() {
     <div className="space-y-6">
       <PageHeader
         eyebrow="Running costs"
-        title="Service bills, repairs & fuel"
+        title="Running costs"
         actions={
           (tab === "costs" ? can("costs:create") : can("fuel:create")) && (
             <Button variant="dark" onClick={() => setAdding(true)}>
@@ -41,7 +41,7 @@ function Costs() {
         }
       />
       {showFuel && (
-        <div className="flex border-b border-line text-xs font-bold tracking-wider uppercase">
+        <div className="flex border-b border-line text-xs font-semibold tracking-normal">
           {(
             [
               ["costs", "Workshop costs", <Wrench key="w" size={14} />],
@@ -110,10 +110,10 @@ function CostTable() {
               {costs.data.map((c) => (
                 <tr key={c.id} className={table.row}>
                   {listed("incurredAt") && <td className={`${table.td} text-muted`}>{format.day(c.incurredAt)}</td>}
-                  <td className={`${table.td} font-bold text-brand`}>{c.vehicle.plateNumber}</td>
+                  <td className={`${table.td} font-semibold text-brand`}>{c.vehicle.plateNumber}</td>
                   <td className={table.td}>
-                    <div className="font-bold text-ink">{c.title}</div>
-                    <div className="text-[10px] text-muted">{label("costCategories", c.category)}</div>
+                    <div className="font-semibold text-ink">{c.title}</div>
+                    <div className="text-xs text-muted">{label("costCategories", c.category)}</div>
                   </td>
                   {listed("serviceCenter") && <td className={table.td}>{c.serviceCenter ?? "—"}</td>}
                   {listed("invoiceNumber") && <td className={`${table.td} text-muted`}>{c.invoiceNumber ?? "—"}</td>}
@@ -122,7 +122,7 @@ function CostTable() {
                       {column.cell(c)}
                     </td>
                   ))}
-                  <td className={`${table.td} text-right text-sm font-black text-rose-700`}>{format.money(c.amount)}</td>
+                  <td className={`${table.td} text-right text-sm font-semibold text-rose-700`}>{format.money(c.amount)}</td>
                   {can("costs:delete") && (
                     <td className={`${table.td} text-right`}>
                       <button
@@ -176,11 +176,11 @@ function FuelTable() {
               {logs.data.map((f) => (
                 <tr key={f.id} className={table.row}>
                   <td className={`${table.td} text-muted`}>{format.day(f.filledAt)}</td>
-                  <td className={`${table.td} font-bold text-brand`}>{f.vehicle.plateNumber}</td>
+                  <td className={`${table.td} font-semibold text-brand`}>{f.vehicle.plateNumber}</td>
                   <td className={table.td}>{f.station ?? "—"}</td>
-                  <td className={`${table.td} text-right font-bold text-amber-700`}>{format.number(f.liters)} L</td>
+                  <td className={`${table.td} text-right font-semibold text-amber-700`}>{format.number(f.liters)} L</td>
                   <td className={`${table.td} text-right`}>{f.pricePerLiter !== null ? format.money(f.pricePerLiter) : "—"}</td>
-                  <td className={`${table.td} text-right font-bold`}>{format.money(f.totalCost)}</td>
+                  <td className={`${table.td} text-right font-semibold`}>{format.money(f.totalCost)}</td>
                   <td className={`${table.td} text-muted`}>{f.createdBy?.name ?? "—"}</td>
                 </tr>
               ))}

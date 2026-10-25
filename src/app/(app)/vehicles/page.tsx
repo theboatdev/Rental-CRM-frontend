@@ -39,8 +39,8 @@ function Vehicles() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow={`Fleet // ${count} of ${config.limits.maxVehicles} vehicles`}
-        title="Vehicles, rental history & running costs"
+        eyebrow={`Fleet · ${count} of ${config.limits.maxVehicles} vehicles`}
+        title="Vehicles"
         actions={
           can("vehicles:create") && (
             <Button variant="dark" onClick={() => setAdding(true)} disabled={count >= config.limits.maxVehicles} title={count >= config.limits.maxVehicles ? "Your plan's vehicle limit is reached" : undefined}>
@@ -86,51 +86,51 @@ function VehicleCard({ vehicle, onOpen }: { vehicle: VehicleWithStats; onOpen: (
     secondary && `${secondary}/day`,
   ].filter(Boolean);
   return (
-    <article className="group flex flex-col justify-between border border-ink/15 bg-panel transition-colors hover:border-brand">
+    <article className="group flex flex-col justify-between overflow-hidden rounded-lg border border-line bg-panel">
       <div>
-        <div className="relative h-44 overflow-hidden border-b border-line bg-ink">
+        <div className="relative h-44 overflow-hidden border-b border-line bg-paper">
           {listed("thumbnail") && vehicle.thumbnail ? (
             // Vehicle photos are arbitrary https URLs entered by staff, so they aren't routed through next/image.
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={vehicle.thumbnail} alt={`${vehicle.make} ${vehicle.model}`} className="size-full object-cover opacity-95 transition-transform duration-500 group-hover:scale-105" />
+            <img src={vehicle.thumbnail} alt={`${vehicle.make} ${vehicle.model}`} className="size-full object-cover" />
           ) : (
-            <div className="flex size-full items-center justify-center text-white/30">
+            <div className="flex size-full items-center justify-center text-muted/40">
               <Car size={48} />
             </div>
           )}
-          <span className="absolute top-3 left-3 bg-ink px-2 py-0.5 font-mono text-[11px] font-bold tracking-wider text-white">{vehicle.plateNumber}</span>
+          <span className="absolute top-3 left-3 rounded bg-panel/95 px-2 py-1 font-mono text-xs font-semibold tracking-normal text-ink">{vehicle.plateNumber}</span>
           <span className="absolute top-3 right-3">
             <VehicleStatusBadge status={vehicle.status} />
           </span>
-          {specs.length > 0 && <span className="absolute right-3 bottom-2 bg-black/75 px-1.5 py-0.5 font-mono text-[10px] text-white/90">{specs.join(" · ")}</span>}
+          {specs.length > 0 && <span className="absolute right-3 bottom-2 bg-black/75 px-1.5 py-0.5 font-sans text-xs text-white/90">{specs.join(" · ")}</span>}
         </div>
         <div className="space-y-3 p-5">
           <div>
-            <div className="flex items-center justify-between gap-2">
-              <h3 className="text-lg font-black tracking-tight text-ink">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <h3 className="text-base font-semibold tracking-tight text-ink">
                 {vehicle.make} {vehicle.model}
                 {listed("year") && vehicle.year !== null ? ` (${vehicle.year})` : ""}
               </h3>
-              <span className="border border-brand/30 bg-brand/10 px-1.5 py-0.5 font-mono text-[11px] font-bold whitespace-nowrap text-brand">
+              <span className="text-sm font-semibold whitespace-nowrap text-ink">
                 {format.money(vehicle.dailyRate)}/day
               </span>
             </div>
-            {figures.length > 0 && <p className="mt-0.5 font-mono text-[11px] text-muted">{figures.join(" · ")}</p>}
+            {figures.length > 0 && <p className="mt-0.5 font-sans text-xs text-muted">{figures.join(" · ")}</p>}
             {columns.length > 0 && (
-              <p className="mt-0.5 font-mono text-[11px] text-muted">{columns.map((column) => `${column.label}: ${column.cell(vehicle)}`).join(" · ")}</p>
+              <p className="mt-0.5 font-sans text-xs text-muted">{columns.map((column) => `${column.label}: ${column.cell(vehicle)}`).join(" · ")}</p>
             )}
           </div>
-          <dl className="grid grid-cols-2 gap-2 border-t border-line bg-[#FBFBFB] p-2.5 font-mono text-xs">
-            <Figure label="Renters" icon={<Users size={12} className="text-brand" />}>
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 border-t border-line pt-4 text-xs">
+            <Figure label="Renters" icon={<Users size={12} className="text-muted" />}>
               {stats.renters} ({stats.trips} trips)
             </Figure>
             {stats.serviceCosts !== undefined && (
-              <Figure label="Service costs" icon={<Wrench size={12} className="text-rose-600" />}>
+              <Figure label="Service costs" icon={<Wrench size={12} className="text-muted" />}>
                 {format.money(stats.serviceCosts)}
               </Figure>
             )}
             {stats.fuelLiters !== undefined && (
-              <Figure label="Fuel" icon={<Fuel size={12} className="text-amber-600" />}>
+              <Figure label="Fuel" icon={<Fuel size={12} className="text-muted" />}>
                 {format.number(stats.fuelLiters)} L
               </Figure>
             )}
@@ -144,7 +144,7 @@ function VehicleCard({ vehicle, onOpen }: { vehicle: VehicleWithStats; onOpen: (
       </div>
       <div className="p-5 pt-0">
         <Button variant="outline" className="w-full py-2.5" onClick={onOpen}>
-          Open vehicle dossier <ArrowUpRight size={13} />
+          View vehicle <ArrowUpRight size={13} />
         </Button>
       </div>
     </article>
@@ -154,8 +154,8 @@ function VehicleCard({ vehicle, onOpen }: { vehicle: VehicleWithStats; onOpen: (
 function Figure({ label, icon, children }: { label: string; icon?: ReactNode; children: ReactNode }) {
   return (
     <div>
-      <dt className="text-[9px] text-muted uppercase">{label}</dt>
-      <dd className="flex items-center gap-1 font-bold text-ink">
+      <dt className="text-xs text-muted">{label}</dt>
+      <dd className="flex items-center gap-1 font-semibold text-ink">
         {icon}
         {children}
       </dd>

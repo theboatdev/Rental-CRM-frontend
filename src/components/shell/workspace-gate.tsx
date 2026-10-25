@@ -26,10 +26,10 @@ export function WorkspaceGate({ children }: { children: ReactNode }) {
   if (error) return <Problem title={titleFor(error)} detail={error.message} hint={hintFor(error)} retry={() => Promise.all([me.refetch(), config.refetch()])} />;
   if (!me.data || !config.data) {
     return (
-      <div className="flex min-h-svh items-center justify-center font-mono text-xs">
-        <div className="flex items-center gap-3 border border-ink/15 bg-panel p-6">
+      <div className="flex min-h-svh items-center justify-center text-sm">
+        <div className="flex items-center gap-3 rounded-lg border border-line bg-panel p-6">
           <Loader2 size={14} className="animate-spin text-brand" />
-          <span className="font-bold tracking-widest uppercase">Loading your workspace…</span>
+          <span className="font-semibold tracking-normal">Loading your workspace…</span>
         </div>
       </div>
     );
@@ -61,11 +61,11 @@ function hintFor(error: ApiError) {
 
 function Problem({ title, detail, hint, retry }: { title: string; detail: string; hint?: string; retry?: () => unknown }) {
   return (
-    <main className="swiss-grid-bg flex min-h-svh items-center justify-center p-4">
-      <div className="w-full max-w-md space-y-4 border border-ink/15 bg-panel p-6 text-center">
+    <main className="flex min-h-svh items-center justify-center p-4">
+      <div className="w-full max-w-md space-y-4 rounded-lg border border-line bg-panel p-6 text-center leading-relaxed">
         <ShieldAlert className="mx-auto size-10 text-muted" aria-hidden />
-        <h1 className="text-xl font-black tracking-tight">{title}</h1>
-        <p className="font-mono text-xs text-muted">{detail}</p>
+        <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
+        <p className="text-sm text-muted">{detail}</p>
         {hint && <p className="text-sm">{hint}</p>}
         <div className="flex flex-col items-center gap-3">
           <OrganizationSwitcher />

@@ -1,6 +1,6 @@
 import { useId, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
 
-const control = "w-full border border-ink/20 bg-panel p-2 font-mono text-xs text-ink outline-none focus:border-brand disabled:bg-paper disabled:text-muted";
+const control = "min-h-10 w-full rounded-md border border-line bg-panel px-3 py-2 font-sans text-base text-ink placeholder:text-muted/70 sm:text-sm disabled:bg-paper disabled:text-muted";
 
 /**
  * A labelled form control with an optional hint and error. `children` gets
@@ -22,13 +22,13 @@ export function Field({
   const id = useId();
   return (
     <div className={className}>
-      <label htmlFor={id} className="mb-1 block text-[10px] font-bold tracking-wider text-muted uppercase">
+      <label htmlFor={id} className="mb-1.5 block text-xs font-medium text-ink">
         {label}
       </label>
       {children(id)}
-      {hint && !error && <p className="mt-1 text-[10px] text-muted">{hint}</p>}
+      {hint && !error && <p className="mt-1.5 text-xs text-muted">{hint}</p>}
       {error && (
-        <p role="alert" className="mt-1 text-[10px] font-bold text-rose-700">
+        <p role="alert" className="mt-1.5 text-xs font-semibold text-rose-700">
           {error}
         </p>
       )}
@@ -48,7 +48,7 @@ export const Textarea = ({ className = "", ...props }: TextareaHTMLAttributes<HT
 export function Checkbox({ label, checked, onChange, disabled }: { label: ReactNode; checked: boolean; onChange: (checked: boolean) => void; disabled?: boolean }) {
   return (
     <label className={`flex items-start gap-2 text-xs ${disabled ? "opacity-50" : "cursor-pointer"}`}>
-      <input type="checkbox" className="mt-0.5 accent-[var(--brand)]" checked={checked} disabled={disabled} onChange={(e) => onChange(e.target.checked)} />
+      <input type="checkbox" className="mt-0.5 size-4 shrink-0 accent-[var(--brand)]" checked={checked} disabled={disabled} onChange={(e) => onChange(e.target.checked)} />
       <span>{label}</span>
     </label>
   );

@@ -18,8 +18,8 @@ export default function StartPage() {
   if (first) return null;
   return (
     <div className="mx-auto max-w-md border border-ink/15 bg-panel p-6 text-center">
-      <h2 className="text-lg font-black">Nothing to show yet</h2>
-      <p className="mt-2 font-mono text-xs text-muted">Your role doesn&apos;t include any sections. Ask your company&apos;s owner to give you a role.</p>
+      <h2 className="text-lg font-semibold">Nothing to show yet</h2>
+      <p className="mt-2 font-sans text-xs text-muted">Your role doesn&apos;t include any sections. Ask your company&apos;s owner to give you a role.</p>
     </div>
   );
 }

@@ -51,8 +51,8 @@ function Rentals() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow={`Contracts // ${rentals.data?.length ?? "…"} shown`}
-        title="Rentals, hand-overs & returns"
+        eyebrow={`Contracts · ${rentals.data?.length ?? "…"} shown`}
+        title="Rentals"
         actions={
           can("rentals:create") && (
             <Button variant="primary" onClick={() => setBooking(true)}>
@@ -62,13 +62,14 @@ function Rentals() {
         }
       />
 
-      <div className="flex flex-wrap gap-1 font-mono text-[11px] font-bold">
+      <div className="flex flex-wrap gap-1 font-sans text-xs font-semibold">
         {FILTERS.map((f) => (
           <button
             key={f.label}
             type="button"
             onClick={() => setFilter(f.value)}
-            className={`border px-3 py-1.5 uppercase ${filter === f.value ? "border-ink bg-ink text-white" : "border-ink/15 bg-panel text-muted hover:text-ink"}`}
+            aria-pressed={filter === f.value}
+            className={`min-h-10 rounded-md border px-3 py-2 ${filter === f.value ? "border-ink bg-ink text-white" : "border-ink/15 bg-panel text-muted hover:text-ink"}`}
           >
             {f.label}
           </button>
@@ -102,30 +103,30 @@ function Rentals() {
               <tbody>
                 {rentals.data.map((r) => (
                   <tr key={r.id} className={`${table.row} cursor-pointer`} onClick={() => openRental(r.id)}>
-                    <td className={`${table.td} font-bold text-ink`}>{r.code}</td>
-                    <td className={`${table.td} font-bold text-brand`}>{r.vehicle.plateNumber}</td>
+                    <td className={`${table.td} font-semibold text-ink`}>{r.code}</td>
+                    <td className={`${table.td} font-semibold text-brand`}>{r.vehicle.plateNumber}</td>
                     <td className={table.td}>
-                      <div className="font-bold text-ink">{r.renter.fullName}</div>
-                      <div className="text-[10px] text-muted">{r.renter.profileId}</div>
+                      <div className="font-semibold text-ink">{r.renter.fullName}</div>
+                      <div className="text-xs text-muted">{r.renter.profileId}</div>
                     </td>
                     <td className={table.td}>
-                      <div className="font-bold text-ink">
+                      <div className="font-semibold text-ink">
                         {format.day(r.startDate)} → {format.day(r.endDate)}
                       </div>
-                      <div className="text-[10px] text-muted">
+                      <div className="text-xs text-muted">
                         {r.totalDays} days{listed("dailyRate") ? ` @ ${format.money(r.dailyRate)}` : ""}
                       </div>
                     </td>
-                    <td className={`${table.td} text-right font-bold text-ink`}>{format.money(r.totalAmount)}</td>
-                    <td className={`${table.td} text-right ${r.balance > 0 && r.status !== "CANCELLED" ? "font-bold text-rose-700" : "text-muted"}`}>{format.money(r.balance)}</td>
+                    <td className={`${table.td} text-right font-semibold text-ink`}>{format.money(r.totalAmount)}</td>
+                    <td className={`${table.td} text-right ${r.balance > 0 && r.status !== "CANCELLED" ? "font-semibold text-rose-700" : "text-muted"}`}>{format.money(r.balance)}</td>
                     <td className={`${table.td} text-center`}>
                       {r.pickupInspection ? (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase">
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold">
                           <Camera size={12} />
                           {r.dropInspection ? "Pickup + return" : "Pickup"}
                         </span>
                       ) : (
-                        <span className="text-[10px] text-muted">Awaiting hand-over</span>
+                        <span className="text-xs text-muted">Awaiting hand-over</span>
                       )}
                     </td>
                     {columns.map((column) => (

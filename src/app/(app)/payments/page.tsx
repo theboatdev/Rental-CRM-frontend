@@ -37,8 +37,8 @@ function Payments() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow={`Ledger // ${payments.data?.length ?? "…"} entries · net ${format.money(received)}`}
-        title="Payments, advances, deposits & refunds"
+        eyebrow={`Ledger · ${payments.data?.length ?? "…"} entries · net ${format.money(received)}`}
+        title="Payments"
         actions={
           can("payments:record") && can("rentals:read") && (
             <Button variant="dark" onClick={() => setRecording(true)}>
@@ -74,7 +74,7 @@ function Payments() {
               <tbody>
                 {payments.data.map((p) => (
                   <tr key={p.id} className={table.row}>
-                    <td className={`${table.td} font-bold text-ink`}>
+                    <td className={`${table.td} font-semibold text-ink`}>
                       {p.receiptNumber}
                       {p.voided && (
                         <div className="mt-1">
@@ -84,12 +84,12 @@ function Payments() {
                     </td>
                     <td className={`${table.td} text-muted`}>{format.dateTime(p.paidAt)}</td>
                     <td className={table.td}>
-                      <div className="font-bold text-ink">{"fullName" in p.renter ? p.renter.fullName : "—"}</div>
-                      <div className="text-[10px] text-brand">{p.rental.code}</div>
+                      <div className="font-semibold text-ink">{"fullName" in p.renter ? p.renter.fullName : "—"}</div>
+                      <div className="text-xs text-brand">{p.rental.code}</div>
                     </td>
                     <td className={table.td}>
                       {label("paymentMethods", p.method)}
-                      {listed("transactionReference") && p.transactionReference && <div className="text-[10px] text-muted">{p.transactionReference}</div>}
+                      {listed("transactionReference") && p.transactionReference && <div className="text-xs text-muted">{p.transactionReference}</div>}
                     </td>
                     <td className={`${table.td} text-muted`}>{PAYMENT_TYPE_LABELS[p.type]}</td>
                     <td className={`${table.td} text-muted`}>{p.receivedBy?.name ?? "—"}</td>
@@ -98,9 +98,9 @@ function Payments() {
                         {column.cell(p)}
                       </td>
                     ))}
-                    <td className={`${table.td} text-right text-sm font-black ${p.voided ? "text-muted line-through" : p.type === "REFUND" ? "text-rose-700" : "text-emerald-700"}`}>
+                    <td className={`${table.td} text-right text-sm font-semibold ${p.voided ? "text-muted line-through" : p.type === "REFUND" ? "text-rose-700" : "text-emerald-700"}`}>
                       {format.money(p.type === "REFUND" ? -p.amount : p.amount)}
-                      {p.voided && p.voidReason && <div className="text-[10px] font-normal text-muted no-underline">{p.voidReason}</div>}
+                      {p.voided && p.voidReason && <div className="text-xs font-normal text-muted no-underline">{p.voidReason}</div>}
                     </td>
                     {can("payments:void") && (
                       <td className={`${table.td} text-right`}>

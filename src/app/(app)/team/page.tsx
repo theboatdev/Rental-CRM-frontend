@@ -34,8 +34,8 @@ function Team() {
 
   return (
     <div className="space-y-6">
-      <PageHeader eyebrow="Team & roles" title="Who works here, and what they can do" />
-      <div className="flex border-b border-line text-xs font-bold tracking-wider uppercase">
+      <PageHeader eyebrow="Team & roles" title="Team & roles" />
+      <div className="flex border-b border-line text-xs font-semibold tracking-normal">
         {visible.map((t) => (
           <button
             key={t.key}
@@ -86,11 +86,11 @@ function Members() {
                 {members.data.map((m) => (
                   <tr key={m.id} className={table.row}>
                     <td className={table.td}>
-                      <div className="font-bold text-ink">
+                      <div className="font-semibold text-ink">
                         {m.name ?? m.email}
-                        {m.id === me.user.id && <span className="ml-2 text-[10px] text-brand">(you)</span>}
+                        {m.id === me.user.id && <span className="ml-2 text-xs text-brand">(you)</span>}
                       </div>
-                      <div className="text-[10px] text-muted">{m.email}</div>
+                      <div className="text-xs text-muted">{m.email}</div>
                     </td>
                     <td className={table.td}>
                       {manage ? (
@@ -143,7 +143,7 @@ function Members() {
         <ErrorNote error={invitations.error ?? revoke.error} className="m-4" />
         {invitations.data?.length === 0 && <EmptyState>No pending invitations.</EmptyState>}
         {invitations.data && invitations.data.length > 0 && (
-          <ul className="divide-y divide-line font-mono text-xs">
+          <ul className="divide-y divide-line font-sans text-xs">
             {invitations.data.map((i) => (
               <li key={i.id} className="flex items-center justify-between gap-3 px-5 py-3">
                 <span>
@@ -230,11 +230,11 @@ function Roles() {
         {roles.data?.map((role) => (
           <li key={role.key} className="flex flex-col gap-2 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="flex items-center gap-2 font-bold text-ink">
+              <p className="flex items-center gap-2 font-semibold text-ink">
                 {role.name} {role.system ? <Badge tone="muted">System</Badge> : <Badge tone="brand">Custom</Badge>}
               </p>
               {role.description && <p className="text-sm text-muted">{role.description}</p>}
-              <p className="font-mono text-[10px] text-muted">
+              <p className="font-sans text-xs text-muted">
                 {role.permissions.length} permissions · {role.memberCount} {role.memberCount === 1 ? "member" : "members"}
               </p>
             </div>
@@ -307,7 +307,7 @@ function RoleDialog({ role, readOnly, onClose }: { role: Role | null; readOnly: 
         <div className="grid gap-4 sm:grid-cols-2">
           {groups.map(([group, permissions]) => (
             <fieldset key={group} className="space-y-1.5 border border-line p-3">
-              <legend className="px-1 text-[10px] font-bold tracking-wider text-muted uppercase">{group}</legend>
+              <legend className="px-1 text-xs font-semibold tracking-normal text-muted">{group}</legend>
               {permissions?.map((p) => (
                 <Checkbox
                   key={p.key}
@@ -317,7 +317,7 @@ function RoleDialog({ role, readOnly, onClose }: { role: Role | null; readOnly: 
                   label={
                     <>
                       {p.label}
-                      {!p.available && <span className="ml-1 text-[10px] text-muted">(module off)</span>}
+                      {!p.available && <span className="ml-1 text-xs text-muted">(module off)</span>}
                     </>
                   }
                 />
@@ -325,7 +325,7 @@ function RoleDialog({ role, readOnly, onClose }: { role: Role | null; readOnly: 
             </fieldset>
           ))}
         </div>
-        {issue("permissions") && <p className="text-[10px] font-bold text-rose-700">{issue("permissions")}</p>}
+        {issue("permissions") && <p className="text-xs font-semibold text-rose-700">{issue("permissions")}</p>}
         <ErrorNote error={save.error} />
         <div className="flex justify-end gap-2 border-t border-line pt-4">
           <Button variant="outline" onClick={onClose}>
@@ -350,7 +350,7 @@ function Activity() {
       {audit.isPending && <Loading />}
       <ErrorNote error={audit.error} className="m-4" />
       {audit.data?.length === 0 && <EmptyState>No activity recorded yet.</EmptyState>}
-      <ul className="divide-y divide-line font-mono text-xs">
+      <ul className="divide-y divide-line font-sans text-xs">
         {audit.data?.map((entry) => (
           <li key={entry.id} className="flex flex-col gap-1 px-5 py-3 sm:flex-row sm:justify-between">
             <span>{entry.summary}</span>

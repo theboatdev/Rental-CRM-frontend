@@ -66,7 +66,7 @@ function Dossier({ vehicle, onClose }: { vehicle: VehicleDossier; onClose: () =>
         <dl className="grid gap-x-6 gap-y-2 border border-line bg-paper p-4 sm:grid-cols-3">
           {details.map(([label, value]) => (
             <div key={label}>
-              <dt className="text-[10px] font-bold tracking-wider text-muted uppercase">{label}</dt>
+              <dt className="text-xs font-semibold tracking-normal text-muted">{label}</dt>
               <dd className="whitespace-pre-line text-ink">{value}</dd>
             </div>
           ))}
@@ -82,7 +82,7 @@ function Dossier({ vehicle, onClose }: { vehicle: VehicleDossier; onClose: () =>
         {stats.profit !== undefined && <Metric label="Net profit" value={format.money(stats.profit)} note={stats.revenue !== undefined ? `on ${format.money(stats.revenue)}` : undefined} tone={stats.profit >= 0 ? "green" : "rose"} />}
       </div>
 
-      <div className="flex flex-wrap border-b border-line text-xs font-bold tracking-wider uppercase">
+      <div className="flex flex-wrap border-b border-line text-xs font-semibold tracking-normal">
         {visible.map((t) => (
           <button
             key={t.key}
@@ -125,10 +125,10 @@ function RentalHistory({ vehicle }: { vehicle: VehicleDossier }) {
         <tbody>
           {rentals.map((r) => (
             <tr key={r.id} className={table.row}>
-              <td className={`${table.td} font-bold`}>{r.code}</td>
+              <td className={`${table.td} font-semibold`}>{r.code}</td>
               <td className={table.td}>
-                <div className="font-bold">{r.renter.fullName}</div>
-                <div className="text-[10px] text-brand">
+                <div className="font-semibold">{r.renter.fullName}</div>
+                <div className="text-xs text-brand">
                   {r.renter.profileId} · {r.renter.phone}
                 </div>
               </td>
@@ -137,7 +137,7 @@ function RentalHistory({ vehicle }: { vehicle: VehicleDossier }) {
               </td>
               <td className={`${table.td} text-right`}>{r.startMileage !== null ? format.distance(r.startMileage) : "—"}</td>
               <td className={`${table.td} text-right`}>{r.endMileage !== null ? format.distance(r.endMileage) : "On the road"}</td>
-              <td className={`${table.td} text-right font-bold text-emerald-700`}>{r.distance !== null ? `+${format.distance(r.distance)}` : "—"}</td>
+              <td className={`${table.td} text-right font-semibold text-emerald-700`}>{r.distance !== null ? `+${format.distance(r.distance)}` : "—"}</td>
               <td className={`${table.td} text-center`}>
                 <RentalStatusBadge rental={r} />
               </td>
@@ -156,7 +156,7 @@ function ServiceHistory({ vehicle }: { vehicle: VehicleDossier }) {
     <div className="space-y-4">
       {can("costs:create") && (
         <div className="border border-brand/30 bg-brand/5 p-4">
-          <p className="mb-2 flex items-center gap-2 text-[10px] font-bold tracking-wider text-brand uppercase">
+          <p className="mb-2 flex items-center gap-2 text-xs font-semibold tracking-normal text-brand">
             <Wrench size={13} /> Log a service or cost for {vehicle.plateNumber}
           </p>
           <CostForm vehicle={vehicle} />
@@ -169,14 +169,14 @@ function ServiceHistory({ vehicle }: { vehicle: VehicleDossier }) {
           {vehicle.costs?.map((c) => (
             <li key={c.id} className="flex flex-col justify-between gap-2 border border-line p-3 sm:flex-row sm:items-center">
               <div>
-                <p className="text-sm font-bold text-ink">{c.title}</p>
-                <p className="text-[10px] text-muted">
+                <p className="text-sm font-semibold text-ink">{c.title}</p>
+                <p className="text-xs text-muted">
                   {format.day(c.incurredAt)} · {label("costCategories", c.category)}
                   {f("serviceCenter").on && c.serviceCenter ? ` · ${c.serviceCenter}` : ""}
                   {f("odometer").on && c.odometer !== null ? ` · ${format.distance(c.odometer)}` : ""}
                 </p>
               </div>
-              <p className="text-sm font-black text-rose-700">{format.money(c.amount)}</p>
+              <p className="text-sm font-semibold text-rose-700">{format.money(c.amount)}</p>
             </li>
           ))}
         </ul>
@@ -192,7 +192,7 @@ function FuelHistory({ vehicle }: { vehicle: VehicleDossier }) {
     <div className="space-y-4">
       {can("fuel:create") && (
         <div className="border border-amber-300 bg-amber-50/40 p-4">
-          <p className="mb-2 flex items-center gap-2 text-[10px] font-bold tracking-wider text-amber-900 uppercase">
+          <p className="mb-2 flex items-center gap-2 text-xs font-semibold tracking-normal text-amber-900">
             <Fuel size={13} /> Log a fill-up for {vehicle.plateNumber}
           </p>
           <FuelForm vehicle={vehicle} />
@@ -216,11 +216,11 @@ function FuelHistory({ vehicle }: { vehicle: VehicleDossier }) {
             <tbody>
               {logs.map((f) => (
                 <tr key={f.id} className={table.row}>
-                  <td className={`${table.td} font-bold`}>{format.day(f.filledAt)}</td>
+                  <td className={`${table.td} font-semibold`}>{format.day(f.filledAt)}</td>
                   <td className={table.td}>{f.station ?? "—"}</td>
-                  <td className={`${table.td} text-right font-bold text-amber-700`}>{format.number(f.liters)} L</td>
+                  <td className={`${table.td} text-right font-semibold text-amber-700`}>{format.number(f.liters)} L</td>
                   <td className={`${table.td} text-right`}>{f.pricePerLiter !== null ? format.money(f.pricePerLiter) : "—"}</td>
-                  <td className={`${table.td} text-right font-bold`}>{format.money(f.totalCost)}</td>
+                  <td className={`${table.td} text-right font-semibold`}>{format.money(f.totalCost)}</td>
                   <td className={`${table.td} text-right`}>{f.odometer !== null ? format.distance(f.odometer) : "—"}</td>
                 </tr>
               ))}
@@ -286,9 +286,9 @@ function Metric({ label, value, note, tone = "ink" }: { label: string; value: st
   const color = { ink: "text-ink", rose: "text-rose-700", amber: "text-amber-700", green: "text-emerald-700" }[tone];
   return (
     <div>
-      <p className="text-[9px] font-bold text-muted uppercase">{label}</p>
-      <p className={`mt-0.5 text-sm font-bold ${color}`}>{value}</p>
-      {note && <p className="text-[10px] text-muted">{note}</p>}
+      <p className="text-xs font-semibold text-muted">{label}</p>
+      <p className={`mt-0.5 text-sm font-semibold ${color}`}>{value}</p>
+      {note && <p className="text-xs text-muted">{note}</p>}
     </div>
   );
 }

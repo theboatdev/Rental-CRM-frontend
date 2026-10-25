@@ -50,8 +50,8 @@ function Renters() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow={`Renters // ${renters.data?.length ?? "…"} profiles`}
-        title="Renter profiles & document checks"
+        eyebrow={`Renters · ${renters.data?.length ?? "…"} profiles`}
+        title="Renters"
         actions={
           can("renters:create") && (
             <Button variant="dark" onClick={() => setAdding(true)}>
@@ -85,11 +85,11 @@ function Renters() {
               <tbody>
                 {renters.data.map((r) => (
                   <tr key={r.id} className={table.row}>
-                    <td className={`${table.td} font-bold text-brand`}>{r.profileId}</td>
+                    <td className={`${table.td} font-semibold text-brand`}>{r.profileId}</td>
                     <td className={table.td}>
-                      <div className="text-sm font-bold text-ink">{r.fullName}</div>
-                      <div className="text-[11px] text-muted">{r.phone}</div>
-                      {listed("email") && r.email && <div className="text-[10px] text-muted">{r.email}</div>}
+                      <div className="text-sm font-semibold text-ink">{r.fullName}</div>
+                      <div className="text-xs text-muted">{r.phone}</div>
+                      {listed("email") && r.email && <div className="text-xs text-muted">{r.email}</div>}
                     </td>
                     {showType && (
                       <td className={table.td}>
@@ -105,7 +105,7 @@ function Renters() {
                     <td className={table.td}>
                       <div className="flex max-w-md flex-wrap gap-1.5">
                         {r.documents.map((d) => (
-                          <span key={d.id} className="inline-flex items-center gap-1 border border-ink/15 bg-panel px-2 py-0.5 text-[10px]">
+                          <span key={d.id} className="inline-flex items-center gap-1 border border-ink/15 bg-panel px-2 py-0.5 text-xs">
                             <span className={`inline-block size-1.5 ${d.verified ? "bg-emerald-600" : "bg-amber-500"}`} />
                             <strong>{label("documentTypes", d.type)}</strong>
                             {d.number && <span className="text-muted">{d.number}</span>}
@@ -113,12 +113,12 @@ function Renters() {
                         ))}
                       </div>
                       {!r.compliance.ok && (
-                        <p className="mt-1 flex items-center gap-1 text-[10px] font-bold text-rose-700">
+                        <p className="mt-1 flex items-center gap-1 text-xs font-semibold text-rose-700">
                           <AlertTriangle size={11} /> Missing {missingText(r.compliance)}
                         </p>
                       )}
                     </td>
-                    <td className={`${table.td} text-center text-sm font-bold`}>{r.rentalsCount}</td>
+                    <td className={`${table.td} text-center text-sm font-semibold`}>{r.rentalsCount}</td>
                     {columns.map((column) => (
                       <td key={column.key} className={table.td}>
                         {column.cell(r)}
@@ -210,13 +210,13 @@ function RenterDetails({ renter }: { renter: RenterDossier }) {
       )}
 
       {!renter.compliance.ok && (
-        <p className="flex items-center gap-2 border border-rose-300 bg-rose-50 p-3 font-bold text-rose-800">
+        <p className="flex items-center gap-2 border border-rose-300 bg-rose-50 p-3 font-semibold text-rose-800">
           <AlertTriangle size={14} /> Missing {missingText(renter.compliance)}. Check before handing over a vehicle.
         </p>
       )}
 
       <div>
-        <h4 className="mb-2 font-bold tracking-wider text-ink uppercase">{f("documents").label}</h4>
+        <h4 className="mb-2 font-semibold tracking-normal text-ink">{f("documents").label}</h4>
         {renter.documents.length === 0 && <p className="text-muted italic">No documents recorded.</p>}
         <ul className="space-y-2">
           {renter.documents.map((d) => (
@@ -224,8 +224,8 @@ function RenterDetails({ renter }: { renter: RenterDossier }) {
               <div className="flex items-center gap-2">
                 <ShieldCheck size={16} className={d.verified ? "text-emerald-700" : "text-amber-600"} />
                 <div>
-                  <p className="font-bold text-ink">{label("documentTypes", d.type)}</p>
-                  <p className="text-[10px] text-muted">
+                  <p className="font-semibold text-ink">{label("documentTypes", d.type)}</p>
+                  <p className="text-xs text-muted">
                     {d.number ?? "No number"}
                     {d.verified && d.verifiedBy ? ` · checked by ${d.verifiedBy.name}` : ""}
                   </p>
@@ -248,14 +248,14 @@ function RenterDetails({ renter }: { renter: RenterDossier }) {
 
       {can("renters:update") && (
         <div className="border border-brand/30 bg-brand/5 p-3">
-          <p className="mb-2 text-[10px] font-bold tracking-wider text-brand uppercase">Add a document</p>
+          <p className="mb-2 text-xs font-semibold tracking-normal text-brand">Add a document</p>
           <AddDocumentForm renter={renter} />
         </div>
       )}
 
       {renter.rentals && (
         <div>
-          <h4 className="mb-2 font-bold tracking-wider text-ink uppercase">Rentals ({renter.rentals.length})</h4>
+          <h4 className="mb-2 font-semibold tracking-normal text-ink">Rentals ({renter.rentals.length})</h4>
           {renter.rentals.length === 0 ? (
             <p className="text-muted italic">No rentals yet.</p>
           ) : (

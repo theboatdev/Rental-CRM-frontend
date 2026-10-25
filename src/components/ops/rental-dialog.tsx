@@ -60,7 +60,7 @@ function RentalDetails({ rental, onClose }: { rental: RentalDetail; onClose: () 
         <Item label={f("depositAmount").label}>{format.money(rental.depositAmount)}</Item>
         <Item label="Paid">{format.money(rental.paidAmount)}</Item>
         <Item label="Outstanding">
-          <span className={rental.balance > 0 ? "font-bold text-rose-700" : "text-emerald-700"}>{format.money(rental.balance)}</span>
+          <span className={rental.balance > 0 ? "font-semibold text-rose-700" : "text-emerald-700"}>{format.money(rental.balance)}</span>
         </Item>
         {rental.distance !== null && <Item label="Driven">{format.distance(rental.distance)}</Item>}
         {f("notes").on && rental.notes && <Item label={f("notes").label}>{rental.notes}</Item>}
@@ -123,7 +123,7 @@ function RentalDetails({ rental, onClose }: { rental: RentalDetail; onClose: () 
 
       {rental.payments && (
         <div>
-          <h4 className="mb-2 font-bold tracking-wider text-ink uppercase">Payments</h4>
+          <h4 className="mb-2 font-semibold tracking-normal text-ink">Payments</h4>
           {rental.payments.length === 0 ? (
             <p className="text-muted italic">No payments recorded.</p>
           ) : (
@@ -145,7 +145,7 @@ function RentalDetails({ rental, onClose }: { rental: RentalDetail; onClose: () 
                       <td className={table.td}>{format.dateTime(p.paidAt)}</td>
                       <td className={table.td}>{PAYMENT_TYPE_LABELS[p.type]}</td>
                       <td className={table.td}>{label("paymentMethods", p.method)}</td>
-                      <td className={`${table.td} text-right font-bold`}>{format.money(p.type === "REFUND" ? -p.amount : p.amount)}</td>
+                      <td className={`${table.td} text-right font-semibold`}>{format.money(p.type === "REFUND" ? -p.amount : p.amount)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -214,7 +214,7 @@ function InspectionCard({ title, inspection }: { title: string; inspection: Insp
   const { format } = useWorkspace();
   return (
     <div className="border border-ink/15 p-3">
-      <p className="font-bold tracking-wider text-ink uppercase">{title}</p>
+      <p className="font-semibold tracking-normal text-ink">{title}</p>
       {inspection ? (
         <>
           <p className="mt-1 text-muted">
@@ -241,7 +241,7 @@ function InspectionCard({ title, inspection }: { title: string; inspection: Insp
 function Item({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div>
-      <dt className="text-[10px] font-bold tracking-wider text-muted uppercase">{label}</dt>
+      <dt className="text-xs font-semibold tracking-normal text-muted">{label}</dt>
       <dd className="text-ink">{children}</dd>
     </div>
   );

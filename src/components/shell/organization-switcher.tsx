@@ -22,7 +22,7 @@ export function OrganizationSwitcher({ compact = false }: { compact?: boolean })
   return (
     <select
       aria-label="Workspace"
-      className={`border border-ink/20 bg-panel font-mono text-xs outline-none focus:border-brand ${compact ? "max-w-48 p-1.5" : "w-full max-w-xs p-2"}`}
+      className={`min-h-10 rounded-md border border-line bg-panel font-sans text-base sm:text-sm ${compact ? "max-w-32 px-2 py-1.5 sm:max-w-48" : "w-full max-w-xs p-2"}`}
       value={orgId ?? ""}
       disabled={switching}
       onChange={async (event) => {

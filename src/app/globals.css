@@ -1,15 +1,11 @@
 @import "tailwindcss";
 
-/*
- * The tenant app's look: Swiss-style hairlines, monospace labels and one
- * accent colour, the tenant's branding.primaryColor (set as --brand at runtime).
- */
 @theme inline {
-  --color-ink: #0a0a0c;
-  --color-paper: #fafafa;
+  --color-ink: #242925;
+  --color-paper: #f5f6f4;
   --color-panel: #ffffff;
-  --color-muted: #6e7381;
-  --color-line: rgb(10 10 12 / 0.12);
+  --color-muted: #667068;
+  --color-line: #e1e5df;
   --color-brand: var(--brand);
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-jetbrains-mono), ui-monospace, "SFMono-Regular", monospace;
@@ -20,29 +16,41 @@
 }
 
 body {
-  background-color: var(--color-paper);
+  background: var(--color-paper);
   color: var(--color-ink);
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  font-size: 14px;
+  line-height: 1.5;
 }
 
 ::selection {
-  background-color: var(--brand);
-  color: #fff;
+  background: color-mix(in srgb, var(--brand) 18%, white);
+  color: var(--color-ink);
 }
 
-/* Construction grid behind the app, tinted with the brand colour. */
-.swiss-grid-bg {
-  background-image:
-    linear-gradient(to right, color-mix(in srgb, var(--brand) 14%, transparent) 1px, transparent 1px),
-    linear-gradient(to bottom, color-mix(in srgb, var(--brand) 14%, transparent) 1px, transparent 1px);
-  background-size: 80px 80px;
+:where(button, a, input, select, textarea):focus-visible {
+  outline: 2px solid var(--color-ink);
+  outline-offset: 3px;
 }
 
-/* Horizontal tab strip that scrolls without a visible scrollbar. */
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
+:where(button, select, a) {
+  -webkit-tap-highlight-color: transparent;
 }
+
+:where(button:not(:disabled), select:not(:disabled)) {
+  cursor: pointer;
+}
+
+/* Keep wide operational tables contained on small screens. */
 .no-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line) transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

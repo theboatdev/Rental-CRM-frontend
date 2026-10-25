@@ -208,7 +208,7 @@ export function FuelForm({ vehicle, onDone }: { vehicle?: VehicleRef; onDone?: (
         {(id) => <Input id={id} type="number" min="0" value={form.odometer} onChange={(e) => set({ odometer: e.target.value })} />}
       </Field>
       <div className="flex items-end justify-between gap-2 sm:col-span-4">
-        <span className="font-bold text-ink">Total: {format.money(estimate)}</span>
+        <span className="font-semibold text-ink">Total: {format.money(estimate)}</span>
         <Button type="submit" variant="dark" disabled={log.isPending}>
           Log fill-up
         </Button>

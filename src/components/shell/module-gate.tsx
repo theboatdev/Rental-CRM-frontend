@@ -16,11 +16,11 @@ export function ModuleGate({ module, permission, children }: { module?: ModuleKe
   if (allowed) return <>{children}</>;
   return (
     <div className="mx-auto max-w-md border border-ink/15 bg-panel p-6 text-center">
-      <h2 className="text-lg font-black">This section isn&apos;t available</h2>
-      <p className="mt-2 font-mono text-xs text-muted">
+      <h2 className="text-lg font-semibold">This section isn&apos;t available</h2>
+      <p className="mt-2 font-sans text-xs text-muted">
         {module && !moduleOn(module) ? "It's switched off for your company." : "Your role doesn't include it. Ask your company's owner if you need it."}
       </p>
-      <Link href="/" className="mt-4 inline-block font-mono text-xs font-bold text-brand underline">
+      <Link href="/" className="mt-4 inline-block font-sans text-xs font-semibold text-brand underline">
         Back to the start page
       </Link>
     </div>

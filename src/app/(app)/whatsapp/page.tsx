@@ -50,7 +50,7 @@ function Digest() {
     <div className="space-y-6">
       <PageHeader
         eyebrow="WhatsApp digest"
-        title="Weekly fleet digest for management"
+        title="Fleet digest"
         actions={
           data && (
             <Button variant="outline" onClick={copy}>
@@ -64,20 +64,20 @@ function Digest() {
       <ErrorNote error={digest.error} />
       {data && (
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-          <Panel title="Message preview" className="lg:col-span-7" actions={<span className="font-mono text-[10px] text-muted">Built {format.dateTime(data.generatedAt)}</span>}>
-            <pre className="m-5 border border-line bg-[#F8F8F9] p-4 font-mono text-xs leading-relaxed whitespace-pre-wrap select-all">{data.message}</pre>
-            {!data.includesFinancials && <p className="mx-5 mb-5 font-mono text-[11px] text-muted">Money figures are left out because your role doesn&apos;t include financials.</p>}
+          <Panel title="Message preview" className="lg:col-span-7" actions={<span className="font-sans text-xs text-muted">Built {format.dateTime(data.generatedAt)}</span>}>
+            <pre className="m-5 border border-line bg-[#F8F8F9] rounded-md p-4 font-mono text-sm leading-relaxed whitespace-pre-wrap select-all">{data.message}</pre>
+            {!data.includesFinancials && <p className="mx-5 mb-5 font-sans text-xs text-muted">Money figures are left out because your role doesn&apos;t include financials.</p>}
           </Panel>
           <Panel title="Delivery" className="lg:col-span-5">
-            <div className="space-y-4 p-5 font-mono text-xs">
+            <div className="space-y-4 p-5 font-sans text-xs">
               <div>
-                <p className="text-[10px] font-bold text-muted uppercase">Schedule</p>
-                <p className="mt-1 font-bold">
+                <p className="text-xs font-semibold text-muted">Schedule</p>
+                <p className="mt-1 font-semibold">
                   {describeCron(data.cron)} ({data.timezone})
                 </p>
               </div>
               <div>
-                <p className="text-[10px] font-bold text-muted uppercase">Recipients</p>
+                <p className="text-xs font-semibold text-muted">Recipients</p>
                 {data.recipients.length === 0 ? (
                   <p className="mt-1 text-muted">None set yet. The platform team adds them to your configuration.</p>
                 ) : (
@@ -85,7 +85,7 @@ function Digest() {
                     {data.recipients.map((number) => (
                       <li key={number} className="flex items-center justify-between gap-2 border border-line p-2">
                         <span>{number}</span>
-                        <a href={waLink(number)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 font-bold text-brand underline">
+                        <a href={waLink(number)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 font-semibold text-brand underline">
                           <Send size={12} /> Open in WhatsApp
                         </a>
                       </li>
@@ -93,10 +93,10 @@ function Digest() {
                   </ul>
                 )}
               </div>
-              <a href={waLink()} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-1.5 bg-brand px-4 py-2.5 font-bold tracking-wider text-white uppercase hover:brightness-95">
+              <a href={waLink()} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-1.5 bg-brand px-4 py-2.5 font-semibold tracking-normal text-white hover:brightness-95">
                 <Send size={14} /> Share in WhatsApp
               </a>
-              <p className="text-[11px] text-muted">Automatic sending on the schedule is coming. For now, open the message in WhatsApp and send it.</p>
+              <p className="text-xs text-muted">Automatic sending on the schedule is coming. For now, open the message in WhatsApp and send it.</p>
             </div>
           </Panel>
         </div>

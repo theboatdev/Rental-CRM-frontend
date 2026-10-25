@@ -12,12 +12,12 @@ export const metadata: Metadata = { title: "Accept your invitation" };
  */
 export default function SignUpPage() {
   return (
-    <main className="swiss-grid-bg flex min-h-svh flex-col items-center justify-center gap-6 p-4">
-      <div className="text-center">
-        <p className="font-mono text-[10px] font-bold tracking-widest text-brand uppercase">Fleet operations</p>
-        <h1 className="mt-1 text-xl font-black tracking-tight">Accept your invitation</h1>
+    <main className="flex min-h-svh flex-col items-center justify-center gap-6 p-4">
+      <div className="max-w-sm text-center">
+        <p className="font-sans text-xs font-semibold tracking-normal text-muted">Fleet operations</p>
+        <h1 className="mt-2 text-2xl font-semibold tracking-tight">Accept your invitation</h1>
       </div>
-      <Suspense fallback={<div className="h-[480px] w-full max-w-[400px] animate-pulse bg-ink/5" />}>
+      <Suspense fallback={<div className="h-[480px] w-full max-w-[400px] animate-pulse rounded-lg bg-ink/5" />}>
         <SignUp />
       </Suspense>
     </main>

@@ -130,8 +130,8 @@ export function BookingDialog({ defaults, onClose, onBooked }: { defaults: Booki
         </div>
 
         <fieldset>
-          <legend className="mb-2 text-[10px] font-bold tracking-wider text-muted uppercase">{f("vehicle").label} · rate per day</legend>
-          {f("vehicle").help && <p className="mb-2 text-[10px] text-muted">{f("vehicle").help}</p>}
+          <legend className="mb-2 text-xs font-semibold tracking-normal text-muted">{f("vehicle").label} · rate per day</legend>
+          {f("vehicle").help && <p className="mb-2 text-xs text-muted">{f("vehicle").help}</p>}
           {days < 1 && <p className="text-rose-700">The return date must be after the pickup date.</p>}
           {availability.isFetching && <Loading label="Checking availability" />}
           <ErrorNote error={availability.error} />
@@ -162,7 +162,7 @@ export function BookingDialog({ defaults, onClose, onBooked }: { defaults: Booki
               </label>
             ))}
           </div>
-          {issue("vehicleId") && <p className="mt-1 text-[10px] font-bold text-rose-700">{issue("vehicleId")}</p>}
+          {issue("vehicleId") && <p className="mt-1 text-xs font-semibold text-rose-700">{issue("vehicleId")}</p>}
         </fieldset>
 
         {(f("dailyRate").on || f("depositAmount").on) && (

@@ -36,7 +36,7 @@ function Calendar() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow={`Fleet schedule // ${reservations.length} upcoming bookings`}
+        eyebrow={`Fleet schedule · ${reservations.length} upcoming bookings`}
         title="Booking calendar"
         actions={
           canBook && (
@@ -58,7 +58,7 @@ function Calendar() {
         <Button variant="ghost" onClick={() => setMonth(today().slice(0, 7))}>
           Today
         </Button>
-        <div className="ml-auto flex flex-wrap gap-2 font-mono text-[10px]">
+        <div className="ml-auto flex flex-wrap gap-2 font-sans text-xs">
           <span className="bg-emerald-100 px-2 py-1">On the road</span>
           <span className="bg-amber-100 px-2 py-1">Reserved</span>
           <span className="bg-slate-200 px-2 py-1">Completed</span>
@@ -91,7 +91,7 @@ function Calendar() {
               <tbody>
                 {reservations.map((r) => (
                   <tr key={r.id} className={`${table.row} cursor-pointer`} onClick={() => setOpenId(r.id)}>
-                    <td className={`${table.td} font-bold`}>{r.code}</td>
+                    <td className={`${table.td} font-semibold`}>{r.code}</td>
                     <td className={table.td}>
                       {r.vehicle.plateNumber}
                       <br />
@@ -132,7 +132,7 @@ function Grid({ data, canBook, onBook, onOpen }: { data: CalendarMonth; canBook:
   if (data.vehicles.length === 0) return <EmptyState>No vehicles yet.</EmptyState>;
   return (
     <div className="max-h-[560px] overflow-auto">
-      <table className="w-full border-collapse font-mono text-xs">
+      <table className="w-full border-collapse font-sans text-xs">
         <thead className="sticky top-0 z-20 bg-[#F8F8F9]">
           <tr>
             <th className="sticky left-0 z-30 min-w-[180px] bg-[#F8F8F9] p-3 text-left">Vehicle</th>
@@ -170,7 +170,7 @@ function Grid({ data, canBook, onBook, onOpen }: { data: CalendarMonth; canBook:
                   <td key={date} className="border border-line p-0">
                     <button
                       type="button"
-                      className={`h-14 w-full px-1 text-[10px] ${tone} disabled:cursor-default`}
+                      className={`h-14 w-full px-1 text-xs ${tone} disabled:cursor-default`}
                       disabled={blocked}
                       title={rental ? `${rental.code} · ${rental.renter.fullName}` : `${vehicle.plateNumber} · ${date}`}
                       aria-label={rental ? `${rental.code} on ${date}` : `Book ${vehicle.plateNumber} from ${date}`}
