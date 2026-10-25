@@ -24,6 +24,14 @@ See the backend repo's `docs/clerk-setup.md`, steps 7 and 8.
 
 Checks: `npm run typecheck`, `npm run lint`, `npm run build`.
 
+## Netlify
+
+Use `npm run build` as the build command and `.next` as the publish directory. If deploying from a parent repository, set the base directory to `frontend`.
+
+Set the variables from `.env.example` in Netlify's **Project configuration → Environment variables**, using the deployed backend URL for `NEXT_PUBLIC_API_URL`. The `NEXT_PUBLIC_*` values are public browser configuration; create them without **Contains secret values**. Keep `CLERK_SECRET_KEY` marked as secret.
+
+`netlify.toml` excludes only `NEXT_PUBLIC_CLERK_SIGN_IN_URL` and `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` from secret scanning. This handles existing Netlify configurations where these public values were marked as secrets and then detected in generated routes and browser bundles. All other secret scanning remains enabled. Commit the configuration and trigger a new deploy to apply it.
+
 ## How it works
 
 - **Auth.** `src/proxy.ts` (Clerk) requires a session for everything but `/sign-in` and `/sign-up`. Personal accounts are off in Clerk, so a session is only active once the user picks one of their organizations; Clerk's sign-in shows that step. The organization is the tenant.

@@ -1,0 +1,4 @@
+[build.environment]
+  # Public Clerk settings are intentionally included in the browser bundle.
+  # Keep secret scanning enabled for CLERK_SECRET_KEY and all other secrets.
+  SECRETS_SCAN_OMIT_KEYS = "NEXT_PUBLIC_CLERK_SIGN_IN_URL,NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"
