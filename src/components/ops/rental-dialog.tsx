@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
+import { CustomFieldList, CustomFieldsEditor, useFields } from "@/components/ops/fields";
 import { InspectionChecklist } from "@/components/ops/inspection-checklist";
 import { PaymentForm } from "@/components/ops/payment-form";
 import { PAYMENT_TYPE_LABELS, RentalStatusBadge } from "@/components/ops/status";
@@ -13,7 +14,7 @@ import type { Inspection, RentalDetail } from "@/lib/contract";
 import { useRental, useTenantMutation } from "@/lib/queries";
 import { useWorkspace } from "@/lib/workspace";
 
-type Panel = "checkin" | "return" | "payment" | null;
+type Panel = "checkin" | "return" | "payment" | "details" | null;
 
 /** A rental's details, inspections and payments, with the actions the member may take for its status. */
 export function RentalDialog({ rentalId, onClose }: { rentalId: string; onClose: () => void }) {
@@ -29,8 +30,9 @@ export function RentalDialog({ rentalId, onClose }: { rentalId: string; onClose:
 
 function RentalDetails({ rental, onClose }: { rental: RentalDetail; onClose: () => void }) {
   const { can, moduleOn, format, label } = useWorkspace();
+  const { builtIn: f, custom: customFields } = useFields("rentals");
   const [panel, setPanel] = useState<Panel>(null);
-  const cancel = useTenantMutation((request) => request<RentalDetail>("POST", `/rentals/${rental.id}/cancel`));
+  const cancel =useTenantMutation((request) => request<RentalDetail>("POST", `/rentals/${rental.id}/cancel`));
   const canPay = moduleOn("payments") && can("payments:record");
   const toggle = (next: Panel) => setPanel((current) => (current === next ? null : next));
 
@@ -43,24 +45,26 @@ function RentalDetails({ rental, onClose }: { rental: RentalDetail; onClose: () 
       </div>
 
       <dl className="grid gap-x-6 gap-y-2 border border-line bg-paper p-4 sm:grid-cols-2">
-        <Item label="Renter">
+        <Item label={f("renter").label}>
           {rental.renter.fullName} ({rental.renter.profileId}) · {rental.renter.phone}
         </Item>
-        <Item label="Vehicle">
+        <Item label={f("vehicle").label}>
           {rental.vehicle.plateNumber} · {rental.vehicle.make} {rental.vehicle.model}
         </Item>
         <Item label="Dates">
           {format.day(rental.startDate)} → {format.day(rental.endDate)} ({rental.totalDays} days)
         </Item>
-        <Item label="Rate">{format.money(rental.dailyRate)} / day</Item>
+        {/* The rate and deposit are part of what's owed, so they show even when their booking fields are off. */}
+        <Item label={f("dailyRate").label}>{format.money(rental.dailyRate)} / day</Item>
         <Item label="Rental total">{format.money(rental.totalAmount)}</Item>
-        <Item label="Security deposit">{format.money(rental.depositAmount)}</Item>
+        <Item label={f("depositAmount").label}>{format.money(rental.depositAmount)}</Item>
         <Item label="Paid">{format.money(rental.paidAmount)}</Item>
         <Item label="Outstanding">
           <span className={rental.balance > 0 ? "font-bold text-rose-700" : "text-emerald-700"}>{format.money(rental.balance)}</span>
         </Item>
         {rental.distance !== null && <Item label="Driven">{format.distance(rental.distance)}</Item>}
-        {rental.notes && <Item label="Notes">{rental.notes}</Item>}
+        {f("notes").on && rental.notes && <Item label={f("notes").label}>{rental.notes}</Item>}
+        <CustomFieldList section="rentals" values={rental.customFields} />
       </dl>
 
       <div className="grid gap-3 sm:grid-cols-2">
@@ -84,6 +88,11 @@ function RentalDetails({ rental, onClose }: { rental: RentalDetail; onClose: () 
             Record payment
           </Button>
         )}
+        {can("rentals:create") && (f("notes").on || customFields.length > 0) && (
+          <Button variant="outline" onClick={() => toggle("details")}>
+            Edit details
+          </Button>
+        )}
         {rental.status === "RESERVED" && can("rentals:cancel") && (
           <Button
             variant="danger"
@@ -101,6 +110,11 @@ function RentalDetails({ rental, onClose }: { rental: RentalDetail; onClose: () 
 
       {panel === "checkin" && <HandoverForm rental={rental} kind="checkin" onDone={() => setPanel(null)} />}
       {panel === "return" && <HandoverForm rental={rental} kind="return" onDone={() => setPanel(null)} />}
+      {panel === "details" && (
+        <div className="border border-brand/30 bg-brand/5 p-4">
+          <CustomFieldsEditor section="rentals" url={`/rentals/${rental.id}`} values={rental.customFields} notes={rental.notes} onDone={() => setPanel(null)} />
+        </div>
+      )}
       {panel === "payment" && (
         <div className="border border-brand/30 bg-brand/5 p-4">
           <PaymentForm rental={rental} onDone={() => setPanel(null)} />

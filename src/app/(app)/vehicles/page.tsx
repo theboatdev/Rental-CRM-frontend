@@ -3,6 +3,7 @@
 import { ArrowUpRight, Car, Fuel, Plus, Users, Wrench } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState, type ReactNode } from "react";
+import { useListColumns } from "@/components/ops/fields";
 import { VehicleDossierDialog } from "@/components/ops/vehicle-dossier";
 import { VehicleForm } from "@/components/ops/vehicle-form";
 import { FUEL_LABELS, TRANSMISSION_LABELS, VehicleStatusBadge } from "@/components/ops/status";
@@ -70,15 +71,25 @@ function Vehicles() {
   );
 }
 
+const NATIVE_FIELDS = ["plateNumber", "make", "model", "year", "transmission", "fuelType", "dailyRate", "secondaryDailyRate", "depositAmount", "mileage", "thumbnail"];
+
 function VehicleCard({ vehicle, onOpen }: { vehicle: VehicleWithStats; onOpen: () => void }) {
   const { format } = useWorkspace();
+  // The card shows these built-in fields in its own way; the config decides whether each one shows.
+  const { listed, columns } = useListColumns<VehicleWithStats>("vehicles", NATIVE_FIELDS);
   const { stats } = vehicle;
-  const secondary = vehicle.secondaryDailyRate !== null ? format.secondaryMoney(vehicle.secondaryDailyRate) : null;
+  const secondary = listed("secondaryDailyRate") && vehicle.secondaryDailyRate !== null ? format.secondaryMoney(vehicle.secondaryDailyRate) : null;
+  const specs = [listed("transmission") && TRANSMISSION_LABELS[vehicle.transmission], listed("fuelType") && FUEL_LABELS[vehicle.fuelType]].filter(Boolean);
+  const figures = [
+    listed("mileage") && format.distance(vehicle.mileage),
+    listed("depositAmount") && `deposit ${format.money(vehicle.depositAmount)}`,
+    secondary && `${secondary}/day`,
+  ].filter(Boolean);
   return (
     <article className="group flex flex-col justify-between border border-ink/15 bg-panel transition-colors hover:border-brand">
       <div>
         <div className="relative h-44 overflow-hidden border-b border-line bg-ink">
-          {vehicle.thumbnail ? (
+          {listed("thumbnail") && vehicle.thumbnail ? (
             // Vehicle photos are arbitrary https URLs entered by staff, so they aren't routed through next/image.
             // eslint-disable-next-line @next/next/no-img-element
             <img src={vehicle.thumbnail} alt={`${vehicle.make} ${vehicle.model}`} className="size-full object-cover opacity-95 transition-transform duration-500 group-hover:scale-105" />
@@ -91,24 +102,23 @@ function VehicleCard({ vehicle, onOpen }: { vehicle: VehicleWithStats; onOpen: (
           <span className="absolute top-3 right-3">
             <VehicleStatusBadge status={vehicle.status} />
           </span>
-          <span className="absolute right-3 bottom-2 bg-black/75 px-1.5 py-0.5 font-mono text-[10px] text-white/90">
-            {TRANSMISSION_LABELS[vehicle.transmission]} · {FUEL_LABELS[vehicle.fuelType]}
-          </span>
+          {specs.length > 0 && <span className="absolute right-3 bottom-2 bg-black/75 px-1.5 py-0.5 font-mono text-[10px] text-white/90">{specs.join(" · ")}</span>}
         </div>
         <div className="space-y-3 p-5">
           <div>
             <div className="flex items-center justify-between gap-2">
               <h3 className="text-lg font-black tracking-tight text-ink">
-                {vehicle.make} {vehicle.model} ({vehicle.year})
+                {vehicle.make} {vehicle.model}
+                {listed("year") && vehicle.year !== null ? ` (${vehicle.year})` : ""}
               </h3>
               <span className="border border-brand/30 bg-brand/10 px-1.5 py-0.5 font-mono text-[11px] font-bold whitespace-nowrap text-brand">
                 {format.money(vehicle.dailyRate)}/day
               </span>
             </div>
-            <p className="mt-0.5 font-mono text-[11px] text-muted">
-              {format.distance(vehicle.mileage)} · deposit {format.money(vehicle.depositAmount)}
-              {secondary ? ` · ${secondary}/day` : ""}
-            </p>
+            {figures.length > 0 && <p className="mt-0.5 font-mono text-[11px] text-muted">{figures.join(" · ")}</p>}
+            {columns.length > 0 && (
+              <p className="mt-0.5 font-mono text-[11px] text-muted">{columns.map((column) => `${column.label}: ${column.cell(vehicle)}`).join(" · ")}</p>
+            )}
           </div>
           <dl className="grid grid-cols-2 gap-2 border-t border-line bg-[#FBFBFB] p-2.5 font-mono text-xs">
             <Figure label="Renters" icon={<Users size={12} className="text-brand" />}>

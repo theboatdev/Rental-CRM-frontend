@@ -4,7 +4,8 @@ import { Fuel, Settings, Users, Wrench } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { CostForm, FuelForm } from "@/components/ops/cost-forms";
-import { RentalStatusBadge, VehicleStatusBadge } from "@/components/ops/status";
+import { CustomFieldList, useFields, useHasCustomValues } from "@/components/ops/fields";
+import { FUEL_LABELS, RentalStatusBadge, TRANSMISSION_LABELS, VehicleStatusBadge } from "@/components/ops/status";
 import { VehicleForm } from "@/components/ops/vehicle-form";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
@@ -18,8 +19,10 @@ type Tab = "rentals" | "service" | "fuel" | "manage";
 /** A vehicle's dossier: key figures, rental history, service costs, fuel, and (with permission) its settings. */
 export function VehicleDossierDialog({ vehicleId, onClose }: { vehicleId: string; onClose: () => void }) {
   const { data, error, isPending } = useVehicle(vehicleId);
+  const { builtIn: f } = useFields("vehicles");
+  const year = data && f("year").on && data.year !== null ? ` (${data.year})` : "";
   return (
-    <Dialog open onClose={onClose} title={data ? `${data.make} ${data.model} (${data.year})` : "Vehicle"} eyebrow={data ? `Vehicle dossier // ${data.plateNumber}` : "Vehicle dossier"} width="lg">
+    <Dialog open onClose={onClose} title={data ? `${data.make} ${data.model}${year}` : "Vehicle"} eyebrow={data ? `Vehicle dossier // ${data.plateNumber}` : "Vehicle dossier"} width="lg">
       {isPending && <Loading />}
       <ErrorNote error={error} />
       {data && <Dossier vehicle={data} onClose={onClose} />}
@@ -38,6 +41,15 @@ function Dossier({ vehicle, onClose }: { vehicle: VehicleDossier; onClose: () =>
   ];
   const visible = tabs.filter((t) => t.show);
   const [tab, setTab] = useState<Tab | undefined>(visible[0]?.key);
+  const { builtIn: f } = useFields("vehicles");
+  const hasCustomValues = useHasCustomValues("vehicles", vehicle.customFields);
+  const secondary = f("secondaryDailyRate").on && vehicle.secondaryDailyRate !== null ? format.secondaryMoney(vehicle.secondaryDailyRate) : null;
+  const details: Array<[string, string]> = [
+    ...(f("transmission").on ? [[f("transmission").label, TRANSMISSION_LABELS[vehicle.transmission]] as [string, string]] : []),
+    ...(f("fuelType").on ? [[f("fuelType").label, FUEL_LABELS[vehicle.fuelType]] as [string, string]] : []),
+    ...(secondary ? [[f("secondaryDailyRate").label, `${secondary}/day`] as [string, string]] : []),
+    ...(f("notes").on && vehicle.notes ? [[f("notes").label, vehicle.notes] as [string, string]] : []),
+  ];
   const { stats } = vehicle;
 
   return (
@@ -45,9 +57,22 @@ function Dossier({ vehicle, onClose }: { vehicle: VehicleDossier; onClose: () =>
       <div className="flex flex-wrap items-center gap-2">
         <VehicleStatusBadge status={vehicle.status} />
         <span className="text-muted">
-          {format.money(vehicle.dailyRate)}/day · deposit {format.money(vehicle.depositAmount)}
+          {format.money(vehicle.dailyRate)}/day
+          {f("depositAmount").on && ` · ${f("depositAmount").label.toLowerCase()} ${format.money(vehicle.depositAmount)}`}
         </span>
       </div>
+
+      {(details.length > 0 || hasCustomValues) && (
+        <dl className="grid gap-x-6 gap-y-2 border border-line bg-paper p-4 sm:grid-cols-3">
+          {details.map(([label, value]) => (
+            <div key={label}>
+              <dt className="text-[10px] font-bold tracking-wider text-muted uppercase">{label}</dt>
+              <dd className="whitespace-pre-line text-ink">{value}</dd>
+            </div>
+          ))}
+          <CustomFieldList section="vehicles" values={vehicle.customFields} />
+        </dl>
+      )}
 
       <div className="grid grid-cols-2 gap-3 border border-line bg-[#F8F8F9] p-4 text-center sm:grid-cols-5">
         <Metric label="Renters" value={`${stats.renters}`} note={`${stats.trips} rentals`} />
@@ -126,6 +151,7 @@ function RentalHistory({ vehicle }: { vehicle: VehicleDossier }) {
 
 function ServiceHistory({ vehicle }: { vehicle: VehicleDossier }) {
   const { can, format, label } = useWorkspace();
+  const { builtIn: f } = useFields("costs");
   return (
     <div className="space-y-4">
       {can("costs:create") && (
@@ -146,8 +172,8 @@ function ServiceHistory({ vehicle }: { vehicle: VehicleDossier }) {
                 <p className="text-sm font-bold text-ink">{c.title}</p>
                 <p className="text-[10px] text-muted">
                   {format.day(c.incurredAt)} · {label("costCategories", c.category)}
-                  {c.serviceCenter ? ` · ${c.serviceCenter}` : ""}
-                  {c.odometer !== null ? ` · ${format.distance(c.odometer)}` : ""}
+                  {f("serviceCenter").on && c.serviceCenter ? ` · ${c.serviceCenter}` : ""}
+                  {f("odometer").on && c.odometer !== null ? ` · ${format.distance(c.odometer)}` : ""}
                 </p>
               </div>
               <p className="text-sm font-black text-rose-700">{format.money(c.amount)}</p>

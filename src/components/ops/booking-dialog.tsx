@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
+import { CustomFieldInputs, customFieldsPayload, draftOf, useFields, withoutOff } from "@/components/ops/fields";
 import { InspectionChecklist } from "@/components/ops/inspection-checklist";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
@@ -21,7 +22,8 @@ export interface BookingDefaults {
  * Books a vehicle for a renter (POST /rentals). The backend checks the dates,
  * availability and amounts; this form shows its availability per vehicle and
  * any field issues. Optionally records an advance, and when the booking starts
- * today, hands the vehicle over at once.
+ * today, hands the vehicle over at once. Labels and which fields show come
+ * from the config's `fields.rentals`, and `fields.payments` for the advance.
  */
 export function BookingDialog({ defaults, onClose, onBooked }: { defaults: BookingDefaults; onClose: () => void; onBooked?: (rental: RentalDetail) => void }) {
   const { config, can, moduleOn, format, options, today } = useWorkspace();
@@ -36,8 +38,14 @@ export function BookingDialog({ defaults, onClose, onBooked }: { defaults: Booki
     depositAmount: "",
     advance: "",
     method: options("paymentMethods")[0]?.key ?? "",
+    advanceReference: "",
+    advanceNotes: "",
     notes: "",
   });
+  const { builtIn: f, custom: rentalFields } = useFields("rentals");
+  const { builtIn: pf, custom: paymentFields } = useFields("payments");
+  const [custom, setCustom] = useState(() => draftOf(rentalFields));
+  const [advanceCustom, setAdvanceCustom] = useState(() => draftOf(paymentFields));
   const [handOver, setHandOver] = useState(false);
   const [checkedPoints, setCheckedPoints] = useState<string[]>([]);
   const availability = useAvailability(form.startDate, form.endDate);
@@ -46,8 +54,9 @@ export function BookingDialog({ defaults, onClose, onBooked }: { defaults: Booki
   const set = (patch: Partial<typeof form>) => setForm((current) => ({ ...current, ...patch }));
   const days = form.startDate && form.endDate ? daysBetween(form.startDate, form.endDate) : 0;
   const chosen = availability.data?.find((a) => a.vehicle.id === form.vehicleId);
-  const rate = numberOrUndefined(form.dailyRate) ?? chosen?.dailyRate ?? 0;
-  const deposit = numberOrUndefined(form.depositAmount) ?? chosen?.depositAmount ?? 0;
+  // With the rate or deposit field off, bookings take the vehicle's.
+  const rate = (f("dailyRate").on ? numberOrUndefined(form.dailyRate) : undefined) ?? chosen?.dailyRate ?? 0;
+  const deposit = (f("depositAmount").on ? numberOrUndefined(form.depositAmount) : undefined) ?? chosen?.depositAmount ?? 0;
   const canAdvance = moduleOn("payments") && can("payments:record");
   const startsToday = form.startDate === today();
   const canHandOver = startsToday && can("rentals:checkin");
@@ -61,10 +70,18 @@ export function BookingDialog({ defaults, onClose, onBooked }: { defaults: Booki
         renterId: form.renterId,
         startDate: form.startDate,
         endDate: form.endDate,
-        dailyRate: numberOrUndefined(form.dailyRate),
-        depositAmount: numberOrUndefined(form.depositAmount),
-        ...(canAdvance && advance ? { advance: { amount: advance, method: form.method } } : {}),
-        notes: form.notes,
+        ...withoutOff(f, { dailyRate: numberOrUndefined(form.dailyRate), depositAmount: numberOrUndefined(form.depositAmount), notes: form.notes }),
+        ...(canAdvance && advance
+          ? {
+              advance: {
+                amount: advance,
+                method: form.method,
+                ...withoutOff(pf, { transactionReference: form.advanceReference || undefined, notes: form.advanceNotes || undefined }),
+                customFields: customFieldsPayload(paymentFields, advanceCustom),
+              },
+            }
+          : {}),
+        customFields: customFieldsPayload(rentalFields, custom),
         ...(canHandOver && handOver ? { pickup: { checkedPoints } } : {}),
       },
       {
@@ -86,7 +103,7 @@ export function BookingDialog({ defaults, onClose, onBooked }: { defaults: Booki
           submit();
         }}
       >
-        <Field label="Renter" error={issue("renterId")}>
+        <Field label={f("renter").label} hint={f("renter").help} error={issue("renterId")}>
           {(id) =>
             renters.isPending ? (
               <Loading label="Loading renters" />
@@ -104,16 +121,17 @@ export function BookingDialog({ defaults, onClose, onBooked }: { defaults: Booki
         </Field>
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Pickup date" error={issue("startDate")}>
+          <Field label={f("startDate").label} hint={f("startDate").help} error={issue("startDate")}>
             {(id) => <Input id={id} type="date" required min={today()} value={form.startDate} onChange={(e) => set({ startDate: e.target.value })} />}
           </Field>
-          <Field label="Return date" error={issue("endDate")}>
+          <Field label={f("endDate").label} hint={f("endDate").help} error={issue("endDate")}>
             {(id) => <Input id={id} type="date" required min={form.startDate ? addDays(form.startDate, 1) : undefined} value={form.endDate} onChange={(e) => set({ endDate: e.target.value })} />}
           </Field>
         </div>
 
         <fieldset>
-          <legend className="mb-2 text-[10px] font-bold tracking-wider text-muted uppercase">Vehicle · rate per day</legend>
+          <legend className="mb-2 text-[10px] font-bold tracking-wider text-muted uppercase">{f("vehicle").label} · rate per day</legend>
+          {f("vehicle").help && <p className="mb-2 text-[10px] text-muted">{f("vehicle").help}</p>}
           {days < 1 && <p className="text-rose-700">The return date must be after the pickup date.</p>}
           {availability.isFetching && <Loading label="Checking availability" />}
           <ErrorNote error={availability.error} />
@@ -147,21 +165,49 @@ export function BookingDialog({ defaults, onClose, onBooked }: { defaults: Booki
           {issue("vehicleId") && <p className="mt-1 text-[10px] font-bold text-rose-700">{issue("vehicleId")}</p>}
         </fieldset>
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field label={`Daily rate (${config.locale.currency})`} hint="Defaults to the vehicle's rate" error={issue("dailyRate")}>
-            {(id) => <Input id={id} type="number" min="1" step="any" placeholder={chosen ? String(chosen.dailyRate) : ""} value={form.dailyRate} onChange={(e) => set({ dailyRate: e.target.value })} />}
-          </Field>
-          <Field label={`Security deposit (${config.locale.currency})`} hint="Defaults to the vehicle's deposit" error={issue("depositAmount")}>
-            {(id) => <Input id={id} type="number" min="0" step="any" placeholder={chosen ? String(chosen.depositAmount) : ""} value={form.depositAmount} onChange={(e) => set({ depositAmount: e.target.value })} />}
-          </Field>
-        </div>
+        {(f("dailyRate").on || f("depositAmount").on) && (
+          <div className="grid gap-3 sm:grid-cols-2">
+            {f("dailyRate").on && (
+              <Field label={`${f("dailyRate").label} (${config.locale.currency})`} hint={f("dailyRate").help ?? "Defaults to the vehicle's rate"} error={issue("dailyRate")}>
+                {(id) => (
+                  <Input
+                    id={id}
+                    type="number"
+                    required={f("dailyRate").required}
+                    min="1"
+                    step="any"
+                    placeholder={chosen ? String(chosen.dailyRate) : ""}
+                    value={form.dailyRate}
+                    onChange={(e) => set({ dailyRate: e.target.value })}
+                  />
+                )}
+              </Field>
+            )}
+            {f("depositAmount").on && (
+              <Field label={`${f("depositAmount").label} (${config.locale.currency})`} hint={f("depositAmount").help ?? "Defaults to the vehicle's deposit"} error={issue("depositAmount")}>
+                {(id) => (
+                  <Input
+                    id={id}
+                    type="number"
+                    required={f("depositAmount").required}
+                    min="0"
+                    step="any"
+                    placeholder={chosen ? String(chosen.depositAmount) : ""}
+                    value={form.depositAmount}
+                    onChange={(e) => set({ depositAmount: e.target.value })}
+                  />
+                )}
+              </Field>
+            )}
+          </div>
+        )}
 
         {canAdvance && (
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label={`Advance collected (${config.locale.currency})`} error={issue("advance.amount")}>
               {(id) => <Input id={id} type="number" min="0" step="any" value={form.advance} onChange={(e) => set({ advance: e.target.value })} />}
             </Field>
-            <Field label="Payment method" error={issue("advance.method")}>
+            <Field label={pf("method").label} hint={pf("method").help} error={issue("advance.method")}>
               {(id) => (
                 <Select id={id} value={form.method} onChange={(e) => set({ method: e.target.value })}>
                   {options("paymentMethods").map((m) => (
@@ -172,12 +218,36 @@ export function BookingDialog({ defaults, onClose, onBooked }: { defaults: Booki
                 </Select>
               )}
             </Field>
+            {numberOrUndefined(form.advance) ? (
+              <>
+                {pf("transactionReference").on && (
+                  <Field label={pf("transactionReference").label} hint={pf("transactionReference").help} error={issue("advance.transactionReference")}>
+                    {(id) => <Input id={id} required={pf("transactionReference").required} value={form.advanceReference} onChange={(e) => set({ advanceReference: e.target.value })} />}
+                  </Field>
+                )}
+                {/* The booking has notes of its own, so the advance asks for them only when they're required. */}
+                {pf("notes").on && pf("notes").required && (
+                  <Field label={`${pf("notes").label} (advance)`} hint={pf("notes").help} error={issue("advance.notes")}>
+                    {(id) => <Input id={id} required value={form.advanceNotes} onChange={(e) => set({ advanceNotes: e.target.value })} />}
+                  </Field>
+                )}
+                <CustomFieldInputs fields={paymentFields} draft={advanceCustom} onChange={setAdvanceCustom} issue={issue} path="advance.customFields" />
+              </>
+            ) : null}
           </div>
         )}
 
-        <Field label="Notes (flight, delivery, requests)" error={issue("notes")}>
-          {(id) => <Textarea id={id} value={form.notes} onChange={(e) => set({ notes: e.target.value })} />}
-        </Field>
+        {f("notes").on && (
+          <Field label={f("notes").label} hint={f("notes").help} error={issue("notes")}>
+            {(id) => <Textarea id={id} required={f("notes").required} value={form.notes} onChange={(e) => set({ notes: e.target.value })} />}
+          </Field>
+        )}
+
+        {rentalFields.length > 0 && (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <CustomFieldInputs fields={rentalFields} draft={custom} onChange={setCustom} issue={issue} />
+          </div>
+        )}
 
         {canHandOver && (
           <div className="space-y-2">

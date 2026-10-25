@@ -4,6 +4,7 @@ import { Fuel, Plus, Trash2, Wrench } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { CostForm, FuelForm } from "@/components/ops/cost-forms";
+import { useFields, useListColumns } from "@/components/ops/fields";
 import { ModuleGate } from "@/components/shell/module-gate";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
@@ -73,7 +74,10 @@ function Costs() {
 function CostTable() {
   const { can, format, label } = useWorkspace();
   const costs = useCosts();
-  const remove = useTenantMutation((request, cost: Cost) => request<{ deleted: boolean }>("DELETE", `/costs/${cost.id}`));
+  const { builtIn: field } = useFields("costs");
+  // The table shows these built-in fields in its own way; the config decides whether the date, workshop and invoice show.
+  const { listed, columns } = useListColumns<Cost>("costs", ["vehicle", "title", "category", "amount", "incurredAt", "serviceCenter", "invoiceNumber"]);
+  const remove =useTenantMutation((request, cost: Cost) => request<{ deleted: boolean }>("DELETE", `/costs/${cost.id}`));
   const total = costs.data?.reduce((sum, c) => sum + c.amount, 0) ?? 0;
 
   return (
@@ -86,26 +90,38 @@ function CostTable() {
           <table className={table.table}>
             <thead className={table.head}>
               <tr>
-                <th className={table.th}>Date</th>
-                <th className={table.th}>Vehicle</th>
-                <th className={table.th}>Item & category</th>
-                <th className={table.th}>Workshop</th>
-                <th className={table.th}>Invoice</th>
-                <th className={`${table.th} text-right`}>Cost</th>
+                {listed("incurredAt") && <th className={table.th}>{field("incurredAt").label}</th>}
+                <th className={table.th}>{field("vehicle").label}</th>
+                <th className={table.th}>
+                  {field("title").label} & {field("category").label.toLowerCase()}
+                </th>
+                {listed("serviceCenter") && <th className={table.th}>{field("serviceCenter").label}</th>}
+                {listed("invoiceNumber") && <th className={table.th}>{field("invoiceNumber").label}</th>}
+                {columns.map((column) => (
+                  <th key={column.key} className={table.th}>
+                    {column.label}
+                  </th>
+                ))}
+                <th className={`${table.th} text-right`}>{field("amount").label}</th>
                 {can("costs:delete") && <th className={table.th} />}
               </tr>
             </thead>
             <tbody>
               {costs.data.map((c) => (
                 <tr key={c.id} className={table.row}>
-                  <td className={`${table.td} text-muted`}>{format.day(c.incurredAt)}</td>
+                  {listed("incurredAt") && <td className={`${table.td} text-muted`}>{format.day(c.incurredAt)}</td>}
                   <td className={`${table.td} font-bold text-brand`}>{c.vehicle.plateNumber}</td>
                   <td className={table.td}>
                     <div className="font-bold text-ink">{c.title}</div>
                     <div className="text-[10px] text-muted">{label("costCategories", c.category)}</div>
                   </td>
-                  <td className={table.td}>{c.serviceCenter ?? "—"}</td>
-                  <td className={`${table.td} text-muted`}>{c.invoiceNumber ?? "—"}</td>
+                  {listed("serviceCenter") && <td className={table.td}>{c.serviceCenter ?? "—"}</td>}
+                  {listed("invoiceNumber") && <td className={`${table.td} text-muted`}>{c.invoiceNumber ?? "—"}</td>}
+                  {columns.map((column) => (
+                    <td key={column.key} className={table.td}>
+                      {column.cell(c)}
+                    </td>
+                  ))}
                   <td className={`${table.td} text-right text-sm font-black text-rose-700`}>{format.money(c.amount)}</td>
                   {can("costs:delete") && (
                     <td className={`${table.td} text-right`}>

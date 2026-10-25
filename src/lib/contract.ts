@@ -36,6 +36,43 @@ interface Toggle {
   enabled: boolean;
 }
 
+export type FieldSection = "vehicles" | "renters" | "rentals" | "payments" | "costs";
+
+/** A built-in field's settings. Core fields (rates, dates, amounts…) are always on, required and in lists. */
+export interface BuiltInFieldSettings {
+  label: string;
+  helpText: string;
+  active: boolean;
+  required: boolean;
+  showInList: boolean;
+}
+
+interface CustomFieldBase {
+  key: string;
+  label: string;
+  /** Needed when a record is created; a required yes/no field must be ticked. */
+  required: boolean;
+  /** Inactive fields are hidden; records keep their values. */
+  active: boolean;
+  /** Also shown as a column in the section's list. */
+  showInList: boolean;
+  helpText: string;
+}
+
+/** An extra field the tenant's config adds to a kind of record (`fields.<section>.custom`). */
+export type CustomField = CustomFieldBase &
+  (
+    | { type: "text"; maxLength: number }
+    | { type: "longText"; maxLength: number }
+    | { type: "number"; min: number | null; max: number | null }
+    | { type: "date" }
+    | { type: "boolean" }
+    | { type: "select"; options: ListItem[] }
+  );
+
+/** A record's custom field values by key: text, YYYY-MM-DD dates and select option keys as strings. */
+export type CustomFieldValues = Record<string, string | number | boolean>;
+
 export interface TenantConfig {
   schemaVersion: number;
   branding: {
@@ -80,6 +117,8 @@ export interface TenantConfig {
     touristPermitDocumentKeys: string[];
     codePrefixes: { rental: string; booking: string; receipt: string; advance: string; renter: string };
   };
+  /** Every field of each kind of record: settings for the built-in ones, and the tenant's custom fields. */
+  fields: Record<FieldSection, { builtIn: Record<string, BuiltInFieldSettings>; custom: CustomField[] }>;
   limits: { maxVehicles: number; maxUsers: number; storageGb: number };
 }
 
@@ -127,7 +166,8 @@ export interface VehicleStats {
 }
 
 export interface Vehicle extends VehicleRef {
-  year: number;
+  /** Null when the config turns the year off. */
+  year: number | null;
   transmission: Transmission;
   fuelType: FuelType;
   dailyRate: number;
@@ -137,6 +177,7 @@ export interface Vehicle extends VehicleRef {
   status: VehicleStatus;
   thumbnail: string | null;
   notes: string;
+  customFields: CustomFieldValues;
   createdAt: string;
   updatedAt: string;
 }
@@ -194,6 +235,7 @@ export interface Renter extends RenterRef {
   compliance: Compliance;
   source: "COUNTER" | "ONLINE";
   notes: string;
+  customFields: CustomFieldValues;
   rentalsCount: number;
   createdAt: string;
 }
@@ -240,6 +282,7 @@ export interface Rental {
   cancelledAt: string | null;
   createdBy: Actor | null;
   notes: string;
+  customFields: CustomFieldValues;
   createdAt: string;
 }
 
@@ -270,6 +313,7 @@ export interface Payment {
   receivedBy: Actor | null;
   transactionReference: string | null;
   notes: string;
+  customFields: CustomFieldValues;
   voided: boolean;
   voidedAt: string | null;
   voidedBy: Actor | null;
@@ -288,6 +332,7 @@ export interface Cost {
   odometer: number | null;
   createdBy: Actor | null;
   notes: string;
+  customFields: CustomFieldValues;
   createdAt: string;
 }
 

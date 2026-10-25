@@ -47,7 +47,7 @@ Checks: `npm run typecheck`, `npm run lint`, `npm run build`.
 | `src/app/sign-in`, `src/app/sign-up` | Clerk sign-in, and invitation acceptance |
 | `src/app/(app)/` | The signed-in pages: `dashboard`, `vehicles`, `renters`, `rentals`, `calendar`, `payments`, `costs`, `whatsapp`, `team` |
 | `src/components/shell/` | Workspace gate, header and tabs, organization switcher, per-page module gate |
-| `src/components/ops/` | Forms and dialogs shared by pages: booking, rental details, payments, vehicles, costs and fuel, renters |
+| `src/components/ops/` | Forms and dialogs shared by pages: booking, rental details, payments, vehicles, costs and fuel, renters. `custom-fields.tsx` renders the config's custom fields in forms, detail views and lists |
 | `src/components/ui/` | Buttons, dialogs, form fields, tables, badges |
 | `src/lib/contract.ts` | TypeScript types for the backend's responses, written by hand. Keep them in step with `backend/src/tenant/presenters.js` |
 | `src/lib/` | API client, query hooks, workspace context, formatters, dates, navigation |

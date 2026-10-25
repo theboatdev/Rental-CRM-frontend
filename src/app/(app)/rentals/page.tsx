@@ -4,12 +4,13 @@ import { Camera, Plus } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { BookingDialog } from "@/components/ops/booking-dialog";
+import { useFields, useListColumns } from "@/components/ops/fields";
 import { RentalDialog } from "@/components/ops/rental-dialog";
 import { RentalStatusBadge } from "@/components/ops/status";
 import { ModuleGate } from "@/components/shell/module-gate";
 import { Button } from "@/components/ui/button";
 import { EmptyState, ErrorNote, Loading, PageHeader, Panel, table } from "@/components/ui/page";
-import type { RentalStatus } from "@/lib/contract";
+import type { Rental, RentalStatus } from "@/lib/contract";
 import { useRentals } from "@/lib/queries";
 import { useWorkspace } from "@/lib/workspace";
 
@@ -41,6 +42,9 @@ function Rentals() {
   const [booking, setBooking] = useState(params.get("new") === "1");
   const openId = params.get("open");
   const rentals = useRentals(filter);
+  const { builtIn: field } = useFields("rentals");
+  // The table shows these built-in fields in its own way; the config decides whether the rate shows.
+  const { listed, columns } = useListColumns<Rental>("rentals", ["renter", "vehicle", "startDate", "endDate", "dailyRate"]);
 
   const openRental = (id: string | null) => router.replace(id ? `/rentals?open=${id}` : "/rentals", { scroll: false });
 
@@ -81,12 +85,17 @@ function Rentals() {
               <thead className={table.head}>
                 <tr>
                   <th className={table.th}>Code</th>
-                  <th className={table.th}>Vehicle</th>
-                  <th className={table.th}>Renter</th>
+                  <th className={table.th}>{field("vehicle").label}</th>
+                  <th className={table.th}>{field("renter").label}</th>
                   <th className={table.th}>Dates</th>
                   <th className={`${table.th} text-right`}>Total</th>
                   <th className={`${table.th} text-right`}>Outstanding</th>
                   <th className={`${table.th} text-center`}>Inspection</th>
+                  {columns.map((column) => (
+                    <th key={column.key} className={table.th}>
+                      {column.label}
+                    </th>
+                  ))}
                   <th className={`${table.th} text-center`}>Status</th>
                 </tr>
               </thead>
@@ -104,7 +113,7 @@ function Rentals() {
                         {format.day(r.startDate)} → {format.day(r.endDate)}
                       </div>
                       <div className="text-[10px] text-muted">
-                        {r.totalDays} days @ {format.money(r.dailyRate)}
+                        {r.totalDays} days{listed("dailyRate") ? ` @ ${format.money(r.dailyRate)}` : ""}
                       </div>
                     </td>
                     <td className={`${table.td} text-right font-bold text-ink`}>{format.money(r.totalAmount)}</td>
@@ -119,6 +128,11 @@ function Rentals() {
                         <span className="text-[10px] text-muted">Awaiting hand-over</span>
                       )}
                     </td>
+                    {columns.map((column) => (
+                      <td key={column.key} className={table.td}>
+                        {column.cell(r)}
+                      </td>
+                    ))}
                     <td className={`${table.td} text-center`}>
                       <RentalStatusBadge rental={r} />
                     </td>

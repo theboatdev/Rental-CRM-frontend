@@ -3,6 +3,7 @@
 import { Ban, Plus } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { useFields, useListColumns } from "@/components/ops/fields";
 import { PaymentForm } from "@/components/ops/payment-form";
 import { PAYMENT_TYPE_LABELS } from "@/components/ops/status";
 import { ModuleGate } from "@/components/shell/module-gate";
@@ -25,6 +26,9 @@ export default function PaymentsPage() {
 function Payments() {
   const { can, format, label } = useWorkspace();
   const payments = usePayments();
+  const { builtIn: field } = useFields("payments");
+  // The ledger shows these built-in fields in its own way; the config decides whether the reference shows.
+  const { listed, columns } = useListColumns<Payment>("payments", ["type", "method", "amount", "transactionReference"]);
   const [recording, setRecording] = useState(false);
   const [voiding, setVoiding] = useState<Payment | null>(null);
   const live = payments.data?.filter((p) => !p.voided) ?? [];
@@ -55,10 +59,15 @@ function Payments() {
                   <th className={table.th}>Receipt</th>
                   <th className={table.th}>Date</th>
                   <th className={table.th}>Renter / rental</th>
-                  <th className={table.th}>Method</th>
-                  <th className={table.th}>Type</th>
+                  <th className={table.th}>{field("method").label}</th>
+                  <th className={table.th}>{field("type").label}</th>
                   <th className={table.th}>Received by</th>
-                  <th className={`${table.th} text-right`}>Amount</th>
+                  {columns.map((column) => (
+                    <th key={column.key} className={table.th}>
+                      {column.label}
+                    </th>
+                  ))}
+                  <th className={`${table.th} text-right`}>{field("amount").label}</th>
                   {can("payments:void") && <th className={table.th} />}
                 </tr>
               </thead>
@@ -80,10 +89,15 @@ function Payments() {
                     </td>
                     <td className={table.td}>
                       {label("paymentMethods", p.method)}
-                      {p.transactionReference && <div className="text-[10px] text-muted">{p.transactionReference}</div>}
+                      {listed("transactionReference") && p.transactionReference && <div className="text-[10px] text-muted">{p.transactionReference}</div>}
                     </td>
                     <td className={`${table.td} text-muted`}>{PAYMENT_TYPE_LABELS[p.type]}</td>
                     <td className={`${table.td} text-muted`}>{p.receivedBy?.name ?? "—"}</td>
+                    {columns.map((column) => (
+                      <td key={column.key} className={table.td}>
+                        {column.cell(p)}
+                      </td>
+                    ))}
                     <td className={`${table.td} text-right text-sm font-black ${p.voided ? "text-muted line-through" : p.type === "REFUND" ? "text-rose-700" : "text-emerald-700"}`}>
                       {format.money(p.type === "REFUND" ? -p.amount : p.amount)}
                       {p.voided && p.voidReason && <div className="text-[10px] font-normal text-muted no-underline">{p.voidReason}</div>}

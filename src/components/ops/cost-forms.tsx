@@ -2,19 +2,34 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
+import { CustomFieldInputs, customFieldsPayload, draftOf, useFields, withoutOff } from "@/components/ops/fields";
 import { Button } from "@/components/ui/button";
-import { Field, Input, Select, numberOrUndefined } from "@/components/ui/field";
+import { Field, Input, Select, Textarea, numberOrUndefined } from "@/components/ui/field";
 import { ErrorNote } from "@/components/ui/page";
 import type { Cost, FuelLog, VehicleRef } from "@/lib/contract";
 import { useTenantMutation, useVehicles } from "@/lib/queries";
 import { useWorkspace } from "@/lib/workspace";
 
 /** A fixed vehicle, or a picker when the form isn't inside a vehicle's dossier. */
-function VehiclePicker({ vehicle, value, onChange, error }: { vehicle?: VehicleRef; value: string; onChange: (id: string) => void; error?: string }) {
+function VehiclePicker({
+  vehicle,
+  value,
+  onChange,
+  error,
+  label = "Vehicle",
+  hint,
+}: {
+  vehicle?: VehicleRef;
+  value: string;
+  onChange: (id: string) => void;
+  error?: string;
+  label?: string;
+  hint?: string;
+}) {
   const vehicles = useVehicles();
   if (vehicle) return null;
   return (
-    <Field label="Vehicle" error={error} className="sm:col-span-full">
+    <Field label={label} hint={hint} error={error} className="sm:col-span-full">
       {(id) => (
         <Select id={id} required value={value} onChange={(e) => onChange(e.target.value)}>
           <option value="">Choose a vehicle…</option>
@@ -29,7 +44,11 @@ function VehiclePicker({ vehicle, value, onChange, error }: { vehicle?: VehicleR
   );
 }
 
-/** Logs a service bill or other operating cost (POST /costs), categories from the config's `lists.costCategories`. */
+/**
+ * Logs a service bill or other operating cost (POST /costs), categories from
+ * the config's `lists.costCategories`. Labels and which fields show come
+ * from the config's `fields.costs`.
+ */
 export function CostForm({ vehicle, onDone }: { vehicle?: VehicleRef; onDone?: (cost: Cost) => void }) {
   const { config, options, today } = useWorkspace();
   const [form, setForm] = useState({
@@ -41,7 +60,10 @@ export function CostForm({ vehicle, onDone }: { vehicle?: VehicleRef; onDone?: (
     serviceCenter: "",
     invoiceNumber: "",
     odometer: "",
+    notes: "",
   });
+  const { builtIn: f, custom: customFields } = useFields("costs");
+  const [custom, setCustom] = useState(() => draftOf(customFields));
   const log = useTenantMutation((request, body: unknown) => request<Cost>("POST", "/costs", body));
   const set = (patch: Partial<typeof form>) => setForm((current) => ({ ...current, ...patch }));
   const issue = (path: string) => log.error?.issueFor(path);
@@ -53,30 +75,35 @@ export function CostForm({ vehicle, onDone }: { vehicle?: VehicleRef; onDone?: (
         event.preventDefault();
         log.mutate(
           {
-            vehicleId: form.vehicleId,
-            category: form.category,
-            title: form.title,
-            amount: numberOrUndefined(form.amount),
-            incurredAt: form.incurredAt,
-            ...(form.serviceCenter ? { serviceCenter: form.serviceCenter } : {}),
-            ...(form.invoiceNumber ? { invoiceNumber: form.invoiceNumber } : {}),
-            ...(form.odometer ? { odometer: numberOrUndefined(form.odometer) } : {}),
+            ...withoutOff(f, {
+              vehicleId: form.vehicleId,
+              category: form.category,
+              title: form.title,
+              amount: numberOrUndefined(form.amount),
+              incurredAt: form.incurredAt,
+              ...(form.serviceCenter ? { serviceCenter: form.serviceCenter } : {}),
+              ...(form.invoiceNumber ? { invoiceNumber: form.invoiceNumber } : {}),
+              ...(form.odometer ? { odometer: numberOrUndefined(form.odometer) } : {}),
+              notes: form.notes,
+            }),
+            customFields: customFieldsPayload(customFields, custom),
           },
           {
             onSuccess: (cost) => {
               toast.success(`Cost logged for ${cost.vehicle.plateNumber}`);
-              setForm((current) => ({ ...current, title: "", amount: "", invoiceNumber: "", odometer: "" }));
+              setForm((current) => ({ ...current, title: "", amount: "", invoiceNumber: "", odometer: "", notes: "" }));
+              setCustom(draftOf(customFields));
               onDone?.(cost);
             },
           },
         );
       }}
     >
-      <VehiclePicker vehicle={vehicle} value={form.vehicleId} onChange={(vehicleId) => set({ vehicleId })} error={issue("vehicleId")} />
-      <Field label="What was done" error={issue("title")} className="sm:col-span-2">
+      <VehiclePicker vehicle={vehicle} value={form.vehicleId} onChange={(vehicleId) => set({ vehicleId })} error={issue("vehicleId")} label={f("vehicle").label} hint={f("vehicle").help} />
+      <Field label={f("title").label} hint={f("title").help} error={issue("title")} className="sm:col-span-2">
         {(id) => <Input id={id} required placeholder="Engine oil, filter & brake pads" value={form.title} onChange={(e) => set({ title: e.target.value })} />}
       </Field>
-      <Field label="Category" error={issue("category")}>
+      <Field label={f("category").label} hint={f("category").help} error={issue("category")}>
         {(id) => (
           <Select id={id} value={form.category} onChange={(e) => set({ category: e.target.value })}>
             {options("costCategories").map((c) => (
@@ -87,21 +114,35 @@ export function CostForm({ vehicle, onDone }: { vehicle?: VehicleRef; onDone?: (
           </Select>
         )}
       </Field>
-      <Field label={`Cost (${config.locale.currency})`} error={issue("amount")}>
+      <Field label={`${f("amount").label} (${config.locale.currency})`} hint={f("amount").help} error={issue("amount")}>
         {(id) => <Input id={id} type="number" required min="0" step="any" value={form.amount} onChange={(e) => set({ amount: e.target.value })} />}
       </Field>
-      <Field label="Date" error={issue("incurredAt")}>
-        {(id) => <Input id={id} type="date" required max={today()} value={form.incurredAt} onChange={(e) => set({ incurredAt: e.target.value })} />}
-      </Field>
-      <Field label={`Odometer (${config.locale.distanceUnit})`} error={issue("odometer")}>
-        {(id) => <Input id={id} type="number" min="0" value={form.odometer} onChange={(e) => set({ odometer: e.target.value })} />}
-      </Field>
-      <Field label="Workshop / supplier" error={issue("serviceCenter")}>
-        {(id) => <Input id={id} value={form.serviceCenter} onChange={(e) => set({ serviceCenter: e.target.value })} />}
-      </Field>
-      <Field label="Invoice number" error={issue("invoiceNumber")}>
-        {(id) => <Input id={id} value={form.invoiceNumber} onChange={(e) => set({ invoiceNumber: e.target.value })} />}
-      </Field>
+      {f("incurredAt").on && (
+        <Field label={f("incurredAt").label} hint={f("incurredAt").help} error={issue("incurredAt")}>
+          {(id) => <Input id={id} type="date" required max={today()} value={form.incurredAt} onChange={(e) => set({ incurredAt: e.target.value })} />}
+        </Field>
+      )}
+      {f("odometer").on && (
+        <Field label={`${f("odometer").label} (${config.locale.distanceUnit})`} hint={f("odometer").help} error={issue("odometer")}>
+          {(id) => <Input id={id} type="number" required={f("odometer").required} min="0" value={form.odometer} onChange={(e) => set({ odometer: e.target.value })} />}
+        </Field>
+      )}
+      {f("serviceCenter").on && (
+        <Field label={f("serviceCenter").label} hint={f("serviceCenter").help} error={issue("serviceCenter")}>
+          {(id) => <Input id={id} required={f("serviceCenter").required} value={form.serviceCenter} onChange={(e) => set({ serviceCenter: e.target.value })} />}
+        </Field>
+      )}
+      {f("invoiceNumber").on && (
+        <Field label={f("invoiceNumber").label} hint={f("invoiceNumber").help} error={issue("invoiceNumber")}>
+          {(id) => <Input id={id} required={f("invoiceNumber").required} value={form.invoiceNumber} onChange={(e) => set({ invoiceNumber: e.target.value })} />}
+        </Field>
+      )}
+      {f("notes").on && (
+        <Field label={f("notes").label} hint={f("notes").help} error={issue("notes")} className="sm:col-span-3">
+          {(id) => <Textarea id={id} required={f("notes").required} value={form.notes} onChange={(e) => set({ notes: e.target.value })} />}
+        </Field>
+      )}
+      <CustomFieldInputs fields={customFields} draft={custom} onChange={setCustom} issue={issue} />
       <ErrorNote error={log.error} className="sm:col-span-3" />
       <div className="flex justify-end sm:col-span-3">
         <Button type="submit" variant="primary" disabled={log.isPending}>

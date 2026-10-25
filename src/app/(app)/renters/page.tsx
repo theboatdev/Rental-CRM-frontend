@@ -4,6 +4,7 @@ import { AlertTriangle, Eye, Plus, ShieldCheck } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState, type ReactNode } from "react";
 import { toast } from "sonner";
+import { CustomFieldList, CustomFieldsEditor, useFields, useHasCustomValues, useListColumns } from "@/components/ops/fields";
 import { AddDocumentForm, RenterForm } from "@/components/ops/renter-forms";
 import { RentalStatusBadge } from "@/components/ops/status";
 import { ModuleGate } from "@/components/shell/module-gate";
@@ -39,6 +40,10 @@ function Renters() {
   const router = useRouter();
   const [adding, setAdding] = useState(false);
   const missingText = useComplianceText();
+  const { builtIn: f } = useFields("renters");
+  // The table shows these built-in fields in its own way; the config decides whether each one shows.
+  const { listed, columns } = useListColumns<Renter>("renters", ["fullName", "phone", "email", "residentType", "country", "documents"]);
+  const showType = listed("residentType") || listed("country");
   const openId = params.get("open");
   const open = (id: string | null) => router.replace(id ? `/renters?open=${id}` : "/renters", { scroll: false });
 
@@ -66,9 +71,14 @@ function Renters() {
                 <tr>
                   <th className={table.th}>Profile</th>
                   <th className={table.th}>Name & contact</th>
-                  <th className={table.th}>Type</th>
-                  <th className={table.th}>Documents</th>
+                  {showType && <th className={table.th}>{listed("residentType") ? f("residentType").label : f("country").label}</th>}
+                  <th className={table.th}>{f("documents").label}</th>
                   <th className={`${table.th} text-center`}>Rentals</th>
+                  {columns.map((column) => (
+                    <th key={column.key} className={table.th}>
+                      {column.label}
+                    </th>
+                  ))}
                   <th className={`${table.th} text-right`} />
                 </tr>
               </thead>
@@ -79,11 +89,19 @@ function Renters() {
                     <td className={table.td}>
                       <div className="text-sm font-bold text-ink">{r.fullName}</div>
                       <div className="text-[11px] text-muted">{r.phone}</div>
-                      {r.email && <div className="text-[10px] text-muted">{r.email}</div>}
+                      {listed("email") && r.email && <div className="text-[10px] text-muted">{r.email}</div>}
                     </td>
-                    <td className={table.td}>
-                      <Badge tone={r.residentType === "tourist" ? "violet" : "neutral"}>{r.residentType === "tourist" ? `Tourist${r.country ? ` · ${r.country}` : ""}` : "Resident"}</Badge>
-                    </td>
+                    {showType && (
+                      <td className={table.td}>
+                        {listed("residentType") ? (
+                          <Badge tone={r.residentType === "tourist" ? "violet" : "neutral"}>
+                            {r.residentType === "tourist" ? `Tourist${listed("country") && r.country ? ` · ${r.country}` : ""}` : "Resident"}
+                          </Badge>
+                        ) : (
+                          (r.country ?? "—")
+                        )}
+                      </td>
+                    )}
                     <td className={table.td}>
                       <div className="flex max-w-md flex-wrap gap-1.5">
                         {r.documents.map((d) => (
@@ -101,6 +119,11 @@ function Renters() {
                       )}
                     </td>
                     <td className={`${table.td} text-center text-sm font-bold`}>{r.rentalsCount}</td>
+                    {columns.map((column) => (
+                      <td key={column.key} className={table.td}>
+                        {column.cell(r)}
+                      </td>
+                    ))}
                     <td className={`${table.td} text-right`}>
                       <Button variant="outline" size="sm" onClick={() => open(r.id)}>
                         <Eye size={12} /> Open
@@ -144,23 +167,47 @@ function RenterDetails({ renter }: { renter: RenterDossier }) {
   const { can, format, label } = useWorkspace();
   const missingText = useComplianceText();
   const verify = useTenantMutation((request, documentId: string) => request<Renter>("POST", `/renters/${renter.id}/documents/${documentId}/verify`));
+  const { builtIn: f, custom: customFields } = useFields("renters");
+  const hasCustomValues = useHasCustomValues("renters", renter.customFields);
+  const canEdit = can("renters:update") && (customFields.length > 0 || f("notes").on);
+  const [editing, setEditing] = useState(false);
 
   return (
     <div className="space-y-4">
       <dl className="space-y-1 border border-line bg-paper p-3">
-        <Row label="Phone">{renter.phone}</Row>
-        {renter.email && <Row label="Email">{renter.email}</Row>}
-        {renter.address && <Row label="Address">{renter.address}</Row>}
-        <Row label="Type">{renter.residentType === "tourist" ? `Tourist${renter.country ? ` (${renter.country})` : ""}` : "Resident"}</Row>
-        {renter.emergencyContact && (
-          <Row label="Emergency contact">
+        <Row label={f("phone").label}>{renter.phone}</Row>
+        {f("email").on && renter.email && <Row label={f("email").label}>{renter.email}</Row>}
+        {f("address").on && renter.address && <Row label={f("address").label}>{renter.address}</Row>}
+        {f("residentType").on && <Row label={f("residentType").label}>{renter.residentType === "tourist" ? "Tourist" : "Resident"}</Row>}
+        {f("country").on && renter.country && <Row label={f("country").label}>{renter.country}</Row>}
+        {f("emergencyContact").on && renter.emergencyContact && (
+          <Row label={f("emergencyContact").label}>
             {[renter.emergencyContact.name, renter.emergencyContact.phone, renter.emergencyContact.relation].filter(Boolean).join(" · ")}
           </Row>
         )}
+        {f("notes").on && renter.notes && <Row label={f("notes").label}>{renter.notes}</Row>}
         <Row label="Registered">
           {format.dateTime(renter.createdAt)} · {renter.source === "ONLINE" ? "guest portal" : "counter"}
         </Row>
       </dl>
+
+      {(hasCustomValues || canEdit) && (
+        <div className="space-y-2 border border-line p-3">
+          {hasCustomValues && (
+            <dl className="grid gap-2 sm:grid-cols-2">
+              <CustomFieldList section="renters" values={renter.customFields} />
+            </dl>
+          )}
+          {canEdit && (
+            <>
+              <Button size="sm" variant="outline" onClick={() => setEditing((on) => !on)}>
+                {editing ? "Close" : "Edit details"}
+              </Button>
+              {editing && <CustomFieldsEditor section="renters" url={`/renters/${renter.id}`} values={renter.customFields} notes={renter.notes} onDone={() => setEditing(false)} />}
+            </>
+          )}
+        </div>
+      )}
 
       {!renter.compliance.ok && (
         <p className="flex items-center gap-2 border border-rose-300 bg-rose-50 p-3 font-bold text-rose-800">
@@ -169,7 +216,7 @@ function RenterDetails({ renter }: { renter: RenterDossier }) {
       )}
 
       <div>
-        <h4 className="mb-2 font-bold tracking-wider text-ink uppercase">Identity documents</h4>
+        <h4 className="mb-2 font-bold tracking-wider text-ink uppercase">{f("documents").label}</h4>
         {renter.documents.length === 0 && <p className="text-muted italic">No documents recorded.</p>}
         <ul className="space-y-2">
           {renter.documents.map((d) => (
