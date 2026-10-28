@@ -5,6 +5,7 @@ import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { CostForm, FuelForm } from "@/components/ops/cost-forms";
 import { CustomFieldList, useFields, useHasCustomValues } from "@/components/ops/fields";
+import { FileLink } from "@/components/ops/files";
 import { FUEL_LABELS, RentalStatusBadge, TRANSMISSION_LABELS, VehicleStatusBadge } from "@/components/ops/status";
 import { VehicleForm } from "@/components/ops/vehicle-form";
 import { Button } from "@/components/ui/button";
@@ -175,6 +176,11 @@ function ServiceHistory({ vehicle }: { vehicle: VehicleDossier }) {
                   {f("serviceCenter").on && c.serviceCenter ? ` · ${c.serviceCenter}` : ""}
                   {f("odometer").on && c.odometer !== null ? ` · ${format.distance(c.odometer)}` : ""}
                 </p>
+                {c.bill && (
+                  <div className="mt-1">
+                    <FileLink file={c.bill} label="Bill" />
+                  </div>
+                )}
               </div>
               <p className="text-sm font-semibold text-rose-700">{format.money(c.amount)}</p>
             </li>

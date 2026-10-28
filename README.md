@@ -2,6 +2,8 @@
 
 The app a rental company works in every day: fleet, renters, bookings and hand-overs, payments, running costs, the dashboard and the WhatsApp digest, plus team and role management. Each company (tenant) signs in to its own workspace; Shenaly Rent a Car is tenant #1.
 
+It also serves each tenant's public booking page at `/book/<slug>`, where renters register and book without an account.
+
 Next.js 16 (App Router) · React 19 · TypeScript · Tailwind CSS 4 · Clerk · TanStack Query.
 
 ## Run locally
@@ -45,6 +47,11 @@ Set the variables from `.env.example` in Netlify's **Project configuration → E
   - the tenant's branding, set as the `--brand` CSS colour.
 
   The tabs follow the config's `navigation` order and labels (`src/lib/navigation.ts`).
+- **Files.** Document scans, inspection photos and bills go from the browser straight to Cloudinary (`src/lib/uploads.ts`):
+  - the backend signs each upload (`POST /uploads`), the file is posted to Cloudinary, and Cloudinary's response is sent with the record, where the backend checks it;
+  - `FilePicker` (`src/components/ops/files.tsx`) uploads as soon as a file is picked, and forms wait for running uploads before they submit;
+  - responses carry links that expire after 10 minutes, so pages always use fresh data to open a file.
+- **Guest booking page.** `/book/<slug>` (`src/components/booking/booking-page.tsx`) needs no sign-in (`src/proxy.ts`). It calls the backend's `/api/public/<slug>`, derived from `NEXT_PUBLIC_API_URL` by swapping `/v1` for `/public`. The tenant's branding colours the page.
 - **The backend decides.** Hiding UI is never the protection. The API checks every permission and module again, validates every form, and strips profit and margin figures for roles without `financials:view`, so pages render what comes back. Form errors show the backend's field issues.
 
 ## Layout
@@ -54,17 +61,14 @@ Set the variables from `.env.example` in Netlify's **Project configuration → E
 | `src/proxy.ts` | Clerk session check |
 | `src/app/sign-in`, `src/app/sign-up` | Clerk sign-in, and invitation acceptance |
 | `src/app/(app)/` | The signed-in pages: `dashboard`, `vehicles`, `renters`, `rentals`, `calendar`, `payments`, `costs`, `whatsapp`, `team` |
+| `src/app/book/[slug]/`, `src/components/booking/` | The public guest booking page |
 | `src/components/shell/` | Workspace gate, header and tabs, organization switcher, per-page module gate |
-| `src/components/ops/` | Forms and dialogs shared by pages: booking, rental details, payments, vehicles, costs and fuel, renters. `custom-fields.tsx` renders the config's custom fields in forms, detail views and lists |
+| `src/components/ops/` | Forms and dialogs shared by pages: booking, rental details, payments, vehicles, costs and fuel, renters. `fields.tsx` renders the config's custom fields in forms, detail views and lists; `files.tsx` picks, uploads and opens files |
 | `src/components/ui/` | Buttons, dialogs, form fields, tables, badges |
 | `src/lib/contract.ts` | TypeScript types for the backend's responses, written by hand. Keep them in step with `backend/src/tenant/presenters.js` |
-| `src/lib/` | API client, query hooks, workspace context, formatters, dates, navigation |
+| `src/lib/` | API client, query hooks, workspace context, formatters, dates, navigation; `uploads.ts` (Cloudinary uploads) and `public-api.ts` (the guest portal API) |
 | `docs/` | Product scope and client research |
 
-## Not yet
+## WhatsApp digest
 
-These come with Phase 5 (see the backend's `docs/development-roadmap.md`):
-
-- photo and document uploads (inspection photos, ID scans, service bills);
-- the public guest booking page at `/book/<slug>`;
-- sending the WhatsApp digest on its schedule. Today it's previewed and opened in WhatsApp by hand.
+The backend sends the digest on its schedule once the platform team connects the tenant's WhatsApp Business number in the admin dashboard. The WhatsApp page shows whether it's connected and the latest sends. Members with `whatsapp:manage` can send it now, and anyone who can view it can still open it in WhatsApp by hand.

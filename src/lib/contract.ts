@@ -208,10 +208,40 @@ export interface RenterRef {
   phone: string;
 }
 
+/** A stored file (scan, photo, bill). `url` expires after 10 minutes; it's null when the caller can't read the record. */
+export interface FileView {
+  url: string | null;
+  format: string;
+  bytes: number;
+  uploadedAt: string | null;
+}
+
+export type FileKind = "document" | "inspection" | "bill";
+
+/** POST /uploads: the fields of a signed upload, posted to Cloudinary together with the file. */
+export interface UploadSignature {
+  kind: FileKind | "logo";
+  publicId: string;
+  uploadUrl: string;
+  fields: Record<string, string | number>;
+}
+
+/** Cloudinary's response to an upload, in the shape the API takes it back with a record. */
+export interface UploadedFile {
+  publicId: string;
+  version: number;
+  signature: string;
+  format: string;
+  bytes: number;
+  resourceType: "image" | "raw";
+}
+
 export interface RenterDocument {
   id: string;
   type: string;
   number: string | null;
+  /** The scan, when one was uploaded. */
+  file: FileView | null;
   verified: boolean;
   verifiedBy: Actor | null;
   verifiedAt: string | null;
@@ -250,7 +280,10 @@ export interface Inspection {
   at: string;
   by: Actor | null;
   odometer: number | null;
+  /** The checked inspection points. */
   points: string[];
+  /** The points with a photo. */
+  photos: Array<{ point: string; file: FileView | null }>;
   notes: string;
 }
 
@@ -329,6 +362,8 @@ export interface Cost {
   incurredAt: string;
   serviceCenter: string | null;
   invoiceNumber: string | null;
+  /** The scanned bill. */
+  bill: FileView | null;
   odometer: number | null;
   createdBy: Actor | null;
   notes: string;
@@ -381,6 +416,22 @@ export interface Dashboard {
   alerts: DashboardAlert[];
 }
 
+/** One sending of the digest, on its schedule or by hand. */
+export interface DigestRun {
+  id: string;
+  trigger: "schedule" | "manual";
+  slot: string | null;
+  status: "sending" | "sent" | "partial" | "failed";
+  mode: "text" | "template" | null;
+  includesFinancials: boolean;
+  results: Array<{ to: string; ok: boolean; error: string | null }>;
+  /** Why nothing was sent, e.g. no WhatsApp connection. */
+  error: string | null;
+  by: Actor | null;
+  startedAt: string;
+  finishedAt: string | null;
+}
+
 export interface WhatsAppDigest {
   message: string;
   recipients: string[];
@@ -388,6 +439,8 @@ export interface WhatsAppDigest {
   timezone: string;
   includesFinancials: boolean;
   generatedAt: string;
+  /** Whether the workspace's WhatsApp is connected (the platform team sets it up), and the latest runs. */
+  delivery: { connected: boolean; mode: "text" | "template" | null; runs: DigestRun[] } | null;
 }
 
 export interface Member {
@@ -439,4 +492,70 @@ export interface AuditEntry {
 export interface ApiIssue {
   path: string;
   message: string;
+}
+
+// Guest booking portal: /api/public/:slug, used by /book/<slug> without sign-in.
+
+export interface PortalFieldSetting {
+  label: string;
+  helpText: string;
+  on: boolean;
+  required: boolean;
+}
+
+/** GET /api/public/:slug: what the booking page needs. */
+export interface PortalProfile {
+  tenant: { name: string; slug: string };
+  branding: TenantConfig["branding"];
+  locale: Pick<TenantConfig["locale"], "country" | "currency" | "timezone" | "dateLocale" | "distanceUnit">;
+  /** Today in the tenant's timezone, YYYY-MM-DD. */
+  today: string;
+  minRentalDays: number;
+  residentTypes: ResidentType[];
+  requireDocumentUpload: boolean;
+  /** Whether scans can be uploaded at all (the platform's file storage is set up). */
+  uploads: boolean;
+  documentTypes: Array<{ key: string; label: string; requiredFor: ResidentType[] }>;
+  fields: {
+    renter: Record<"email" | "residentType" | "country" | "address" | "emergencyContact", PortalFieldSetting>;
+    rental: { notes: PortalFieldSetting };
+  };
+}
+
+export interface GuestVehicle {
+  id: string;
+  make: string;
+  model: string;
+  year: number | null;
+  transmission: Transmission;
+  fuelType: FuelType;
+  dailyRate: number;
+  depositAmount: number;
+  /** For the whole stay. */
+  totalAmount: number;
+  thumbnail: string | null;
+}
+
+/** GET /api/public/:slug/vehicles?startDate&endDate */
+export interface GuestVehicles {
+  startDate: string;
+  endDate: string;
+  totalDays: number;
+  vehicles: GuestVehicle[];
+}
+
+/** POST /api/public/:slug/bookings: the voucher. */
+export interface GuestVoucher {
+  bookingCode: string;
+  profileId: string;
+  fullName: string;
+  vehicle: { make: string; model: string; year: number | null };
+  startDate: string;
+  endDate: string;
+  totalDays: number;
+  dailyRate: number;
+  totalAmount: number;
+  depositAmount: number;
+  documents: Array<{ type: string; scanned: boolean }>;
+  createdAt: string;
 }

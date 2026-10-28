@@ -5,7 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { CustomFieldList, CustomFieldsEditor, useFields, useHasCustomValues, useListColumns } from "@/components/ops/fields";
-import { AddDocumentForm, RenterForm } from "@/components/ops/renter-forms";
+import { FileLink } from "@/components/ops/files";
+import { AddDocumentForm, AttachScan, RenterForm } from "@/components/ops/renter-forms";
 import { RentalStatusBadge } from "@/components/ops/status";
 import { ModuleGate } from "@/components/shell/module-gate";
 import { Button } from "@/components/ui/button";
@@ -229,17 +230,23 @@ function RenterDetails({ renter }: { renter: RenterDossier }) {
                     {d.number ?? "No number"}
                     {d.verified && d.verifiedBy ? ` · checked by ${d.verifiedBy.name}` : ""}
                   </p>
+                  <div className="mt-1 flex flex-wrap items-center gap-3">
+                    {d.file ? <FileLink file={d.file} label="View scan" /> : <span className="text-xs text-muted italic">No scan</span>}
+                  </div>
                 </div>
               </div>
-              {d.verified ? (
-                <Badge tone="green">Verified</Badge>
-              ) : can("renters:documents:verify") ? (
-                <Button size="sm" variant="success" disabled={verify.isPending} onClick={() => verify.mutate(d.id, { onSuccess: () => toast.success("Document verified") })}>
-                  Mark verified
-                </Button>
-              ) : (
-                <Badge tone="amber">Not verified</Badge>
-              )}
+              <div className="flex shrink-0 flex-col items-end gap-2">
+                {d.verified ? (
+                  <Badge tone="green">Verified</Badge>
+                ) : can("renters:documents:verify") ? (
+                  <Button size="sm" variant="success" disabled={verify.isPending} onClick={() => verify.mutate(d.id, { onSuccess: () => toast.success("Document verified") })}>
+                    Mark verified
+                  </Button>
+                ) : (
+                  <Badge tone="amber">Not verified</Badge>
+                )}
+                {can("renters:update") && <AttachScan renter={renter} document={d} />}
+              </div>
             </li>
           ))}
         </ul>

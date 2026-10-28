@@ -3,11 +3,13 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { CustomFieldInputs, customFieldsPayload, draftOf, useFields, withoutOff } from "@/components/ops/fields";
+import { FilePicker, useUploadsInFlight } from "@/components/ops/files";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Select, Textarea, numberOrUndefined } from "@/components/ui/field";
 import { ErrorNote } from "@/components/ui/page";
-import type { Cost, FuelLog, VehicleRef } from "@/lib/contract";
+import type { Cost, FuelLog, UploadedFile, VehicleRef } from "@/lib/contract";
 import { useTenantMutation, useVehicles } from "@/lib/queries";
+import { DOCUMENT_ACCEPT, useFileUpload } from "@/lib/uploads";
 import { useWorkspace } from "@/lib/workspace";
 
 /** A fixed vehicle, or a picker when the form isn't inside a vehicle's dossier. */
@@ -46,8 +48,9 @@ function VehiclePicker({
 
 /**
  * Logs a service bill or other operating cost (POST /costs), categories from
- * the config's `lists.costCategories`. Labels and which fields show come
- * from the config's `fields.costs`.
+ * the config's `lists.costCategories`, with the scanned bill (required by
+ * `modules.costs.requireBillUpload`). Labels and which fields show come from
+ * the config's `fields.costs`.
  */
 export function CostForm({ vehicle, onDone }: { vehicle?: VehicleRef; onDone?: (cost: Cost) => void }) {
   const { config, options, today } = useWorkspace();
@@ -64,6 +67,10 @@ export function CostForm({ vehicle, onDone }: { vehicle?: VehicleRef; onDone?: (
   });
   const { builtIn: f, custom: customFields } = useFields("costs");
   const [custom, setCustom] = useState(() => draftOf(customFields));
+  const [bill, setBill] = useState<UploadedFile | null>(null);
+  const uploadBill = useFileUpload("bill");
+  const { uploading, onBusy } = useUploadsInFlight();
+  const billRequired = config.modules.costs.requireBillUpload;
   const log = useTenantMutation((request, body: unknown) => request<Cost>("POST", "/costs", body));
   const set = (patch: Partial<typeof form>) => setForm((current) => ({ ...current, ...patch }));
   const issue = (path: string) => log.error?.issueFor(path);
@@ -86,6 +93,7 @@ export function CostForm({ vehicle, onDone }: { vehicle?: VehicleRef; onDone?: (
               ...(form.odometer ? { odometer: numberOrUndefined(form.odometer) } : {}),
               notes: form.notes,
             }),
+            ...(bill ? { billFile: bill } : {}),
             customFields: customFieldsPayload(customFields, custom),
           },
           {
@@ -93,6 +101,7 @@ export function CostForm({ vehicle, onDone }: { vehicle?: VehicleRef; onDone?: (
               toast.success(`Cost logged for ${cost.vehicle.plateNumber}`);
               setForm((current) => ({ ...current, title: "", amount: "", invoiceNumber: "", odometer: "", notes: "" }));
               setCustom(draftOf(customFields));
+              setBill(null);
               onDone?.(cost);
             },
           },
@@ -143,13 +152,45 @@ export function CostForm({ vehicle, onDone }: { vehicle?: VehicleRef; onDone?: (
         </Field>
       )}
       <CustomFieldInputs fields={customFields} draft={custom} onChange={setCustom} issue={issue} />
+      <div className="sm:col-span-3">
+        <FilePicker
+          label="Scanned bill"
+          required={billRequired}
+          upload={uploadBill}
+          value={bill}
+          onChange={setBill}
+          onBusy={onBusy}
+          accept={DOCUMENT_ACCEPT}
+          hint="A photo or PDF of the workshop's bill."
+          error={issue("billFile")}
+        />
+      </div>
       <ErrorNote error={log.error} className="sm:col-span-3" />
       <div className="flex justify-end sm:col-span-3">
-        <Button type="submit" variant="primary" disabled={log.isPending}>
-          Log cost
+        <Button type="submit" variant="primary" disabled={log.isPending || uploading || (billRequired && !bill)}>
+          {uploading ? "Uploading…" : "Log cost"}
         </Button>
       </div>
     </form>
+  );
+}
+
+/** Attaches the scanned bill to a cost logged without one (PUT /costs/:id/bill). */
+export function AttachBill({ cost }: { cost: Cost }) {
+  const uploadBill = useFileUpload("bill");
+  const attach = useTenantMutation((request, billFile: UploadedFile) => request<Cost>("PUT", `/costs/${cost.id}/bill`, { billFile }));
+  return (
+    <div className="w-36">
+      <FilePicker
+        compact
+        label="Attach bill"
+        upload={uploadBill}
+        value={null}
+        onChange={(file) => file && attach.mutate(file, { onSuccess: () => toast.success("Bill attached") })}
+        accept={DOCUMENT_ACCEPT}
+        error={attach.error?.message}
+      />
+    </div>
   );
 }
 

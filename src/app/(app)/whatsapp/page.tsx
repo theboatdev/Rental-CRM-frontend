@@ -2,10 +2,12 @@
 
 import { Check, Copy, Send } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 import { ModuleGate } from "@/components/shell/module-gate";
 import { Button } from "@/components/ui/button";
-import { ErrorNote, Loading, PageHeader, Panel } from "@/components/ui/page";
-import { useDigest } from "@/lib/queries";
+import { Badge, ErrorNote, Loading, PageHeader, Panel, type Tone } from "@/components/ui/page";
+import type { DigestRun, WhatsAppDigest } from "@/lib/contract";
+import { useDigest, useTenantMutation } from "@/lib/queries";
 import { useWorkspace } from "@/lib/workspace";
 
 export default function WhatsAppPage() {
@@ -27,10 +29,18 @@ function describeCron(cron: string) {
   return /^[0-6]$/.test(dayOfWeek) ? `Every ${DAYS[Number(dayOfWeek)]} at ${time}` : cron;
 }
 
+const RUN_STATUS: Record<DigestRun["status"], { label: string; tone: Tone }> = {
+  sending: { label: "Sending", tone: "muted" },
+  sent: { label: "Sent", tone: "green" },
+  partial: { label: "Partly sent", tone: "amber" },
+  failed: { label: "Failed", tone: "rose" },
+};
+
 /**
- * The weekly digest as it would be sent, built by the backend from live data.
- * Scheduled sending through the WhatsApp Cloud API comes in Phase 5; until then
- * it can be copied or opened in WhatsApp for each recipient.
+ * The weekly digest as it's sent, built by the backend from live data. Once
+ * the platform team connects the workspace's WhatsApp Business number, the
+ * backend sends it on the schedule; members with whatsapp:manage can also
+ * send it now. It can always be copied or opened in WhatsApp by hand.
  */
 function Digest() {
   const { format } = useWorkspace();
@@ -96,10 +106,72 @@ function Digest() {
               <a href={waLink()} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-1.5 bg-brand px-4 py-2.5 font-semibold tracking-normal text-white hover:brightness-95">
                 <Send size={14} /> Share in WhatsApp
               </a>
-              <p className="text-xs text-muted">Automatic sending on the schedule is coming. For now, open the message in WhatsApp and send it.</p>
+              <AutomaticDelivery digest={data} />
             </div>
           </Panel>
         </div>
+      )}
+    </div>
+  );
+}
+
+function AutomaticDelivery({ digest }: { digest: WhatsAppDigest }) {
+  const { can, format } = useWorkspace();
+  const send = useTenantMutation((request) => request<DigestRun>("POST", "/whatsapp/digest/send"));
+  const delivery = digest.delivery;
+  if (!delivery) return null;
+
+  return (
+    <div className="space-y-3 border-t border-line pt-4">
+      <p className="text-xs font-semibold text-muted">Automatic sending</p>
+      {delivery.connected ? (
+        <p>
+          Sent on the schedule from your WhatsApp Business number
+          {delivery.mode === "template" ? ", as your approved message template." : ", as plain text."}
+          {delivery.mode === "text" && (
+            <span className="mt-1 block text-muted">
+              WhatsApp only delivers plain text to people who wrote to your number in the last 24 hours. For reliable weekly delivery, ask the platform team to add an approved template.
+            </span>
+          )}
+        </p>
+      ) : (
+        <p className="text-muted">Not connected yet. The platform team connects your WhatsApp Business number; until then, open the message in WhatsApp and send it.</p>
+      )}
+      {can("whatsapp:manage") && delivery.connected && (
+        <Button
+          variant="outline"
+          disabled={send.isPending || digest.recipients.length === 0}
+          onClick={() =>
+            send.mutate(undefined, {
+              onSuccess: (run) => (run.status === "sent" ? toast.success("Digest sent") : toast.error(`${RUN_STATUS[run.status].label}: ${run.error ?? "see below"}`)),
+            })
+          }
+        >
+          <Send size={14} /> {send.isPending ? "Sending…" : "Send now"}
+        </Button>
+      )}
+      <ErrorNote error={send.error} />
+      {delivery.runs.length > 0 && (
+        <ul className="space-y-2">
+          {delivery.runs.map((run) => (
+            <li key={run.id} className="space-y-1 border border-line p-2">
+              <div className="flex items-center justify-between gap-2">
+                <span>
+                  {format.dateTime(run.startedAt)} · {run.trigger === "schedule" ? "on schedule" : `by ${run.by?.name ?? "hand"}`}
+                </span>
+                <Badge tone={RUN_STATUS[run.status].tone}>{RUN_STATUS[run.status].label}</Badge>
+              </div>
+              {run.error && <p className="text-rose-700">{run.error}</p>}
+              {run.results
+                .filter((result) => !result.ok)
+                .map((result) => (
+                  <p key={result.to} className="text-rose-700">
+                    {result.to}: {result.error}
+                  </p>
+                ))}
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );

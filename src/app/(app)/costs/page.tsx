@@ -3,8 +3,9 @@
 import { Fuel, Plus, Trash2, Wrench } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-import { CostForm, FuelForm } from "@/components/ops/cost-forms";
+import { AttachBill, CostForm, FuelForm } from "@/components/ops/cost-forms";
 import { useFields, useListColumns } from "@/components/ops/fields";
+import { FileLink } from "@/components/ops/files";
 import { ModuleGate } from "@/components/shell/module-gate";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
@@ -103,6 +104,7 @@ function CostTable() {
                   </th>
                 ))}
                 <th className={`${table.th} text-right`}>{field("amount").label}</th>
+                <th className={table.th}>Bill</th>
                 {can("costs:delete") && <th className={table.th} />}
               </tr>
             </thead>
@@ -123,6 +125,11 @@ function CostTable() {
                     </td>
                   ))}
                   <td className={`${table.td} text-right text-sm font-semibold text-rose-700`}>{format.money(c.amount)}</td>
+                  <td className={table.td}>
+                    <div className="flex flex-col items-start gap-1.5">
+                      {c.bill ? <FileLink file={c.bill} label="Bill" /> : can("costs:create") ? <AttachBill cost={c} /> : <span className="text-xs text-muted">—</span>}
+                    </div>
+                  </td>
                   {can("costs:delete") && (
                     <td className={`${table.td} text-right`}>
                       <button

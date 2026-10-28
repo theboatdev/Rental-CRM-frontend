@@ -3,7 +3,8 @@
 import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { CustomFieldList, CustomFieldsEditor, useFields } from "@/components/ops/fields";
-import { InspectionChecklist } from "@/components/ops/inspection-checklist";
+import { PhotoThumb, useUploadsInFlight } from "@/components/ops/files";
+import { InspectionChecklist, photosPayload, type InspectionPhotos } from "@/components/ops/inspection-checklist";
 import { PaymentForm } from "@/components/ops/payment-form";
 import { PAYMENT_TYPE_LABELS, RentalStatusBadge } from "@/components/ops/status";
 import { Button } from "@/components/ui/button";
@@ -168,6 +169,8 @@ function HandoverForm({ rental, kind, onDone }: { rental: RentalDetail; kind: "c
   const { config } = useWorkspace();
   const required = kind === "checkin" ? config.modules.rentals.requirePickupInspection : config.modules.rentals.requireDropInspection;
   const [checkedPoints, setCheckedPoints] = useState<string[]>([]);
+  const [photos, setPhotos] = useState<InspectionPhotos>({});
+  const { uploading, onBusy } = useUploadsInFlight();
   const [odometer, setOdometer] = useState("");
   const [notes, setNotes] = useState("");
   const path = kind === "checkin" ? "check-in" : "return";
@@ -179,7 +182,7 @@ function HandoverForm({ rental, kind, onDone }: { rental: RentalDetail; kind: "c
       onSubmit={(event) => {
         event.preventDefault();
         submit.mutate(
-          { odometer: numberOrUndefined(odometer), checkedPoints, notes },
+          { odometer: numberOrUndefined(odometer), checkedPoints, photos: photosPayload(photos), notes },
           {
             onSuccess: (updated) => {
               toast.success(kind === "checkin" ? `${updated.code} handed over` : `${updated.code} returned`);
@@ -189,7 +192,7 @@ function HandoverForm({ rental, kind, onDone }: { rental: RentalDetail; kind: "c
         );
       }}
     >
-      <InspectionChecklist checked={checkedPoints} onChange={setCheckedPoints} required={required} />
+      <InspectionChecklist checked={checkedPoints} onChange={setCheckedPoints} photos={photos} onPhotosChange={setPhotos} onBusy={onBusy} required={required} />
       <div className="grid gap-3 sm:grid-cols-2">
         <Field
           label={`Odometer (${config.locale.distanceUnit})`}
@@ -202,8 +205,8 @@ function HandoverForm({ rental, kind, onDone }: { rental: RentalDetail; kind: "c
       </div>
       <ErrorNote error={submit.error} />
       <div className="flex justify-end">
-        <Button type="submit" variant={kind === "checkin" ? "primary" : "success"} disabled={submit.isPending}>
-          {kind === "checkin" ? "Confirm hand-over" : "Confirm return"}
+        <Button type="submit" variant={kind === "checkin" ? "primary" : "success"} disabled={submit.isPending || uploading}>
+          {uploading ? "Uploading photos…" : kind === "checkin" ? "Confirm hand-over" : "Confirm return"}
         </Button>
       </div>
     </form>
@@ -229,6 +232,16 @@ function InspectionCard({ title, inspection }: { title: string; inspection: Insp
               </li>
             ))}
           </ul>
+          {inspection.photos.length > 0 && (
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              {inspection.photos.map((photo) => (
+                <figure key={photo.point} className="space-y-1">
+                  <PhotoThumb file={photo.file} alt={photo.point} />
+                  <figcaption className="truncate text-[11px] text-muted">{photo.point}</figcaption>
+                </figure>
+              ))}
+            </div>
+          )}
           {inspection.notes && <p className="mt-2">{inspection.notes}</p>}
         </>
       ) : (

@@ -3,11 +3,13 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { CustomFieldInputs, customFieldsPayload, draftOf, useFields, withoutOff } from "@/components/ops/fields";
+import { FilePicker, useUploadsInFlight } from "@/components/ops/files";
 import { Button } from "@/components/ui/button";
 import { Checkbox, Field, Input, Select, Textarea } from "@/components/ui/field";
 import { ErrorNote } from "@/components/ui/page";
-import type { Renter, ResidentType } from "@/lib/contract";
+import type { Renter, RenterDocument, ResidentType, UploadedFile } from "@/lib/contract";
 import { useTenantMutation } from "@/lib/queries";
+import { DOCUMENT_ACCEPT, useFileUpload } from "@/lib/uploads";
 import { useWorkspace } from "@/lib/workspace";
 
 /** Document types offered for a resident type: those it requires first, then the rest. */
@@ -18,9 +20,9 @@ function useDocumentOptions(residentType: ResidentType) {
 }
 
 /**
- * Registers a renter (POST /renters) with their first identity document. The
- * profile code comes from the backend. Labels, help text and which fields
- * show come from the config's `fields.renters`.
+ * Registers a renter (POST /renters) with their first identity document and
+ * its scan. The profile code comes from the backend. Labels, help text and
+ * which fields show come from the config's `fields.renters`.
  */
 export function RenterForm({ onDone }: { onDone: (renter: Renter) => void }) {
   const { can, config } = useWorkspace();
@@ -42,6 +44,9 @@ export function RenterForm({ onDone }: { onDone: (renter: Renter) => void }) {
     notes: "",
   });
   const [custom, setCustom] = useState(() => draftOf(customFields));
+  const [scan, setScan] = useState<UploadedFile | null>(null);
+  const uploadScan = useFileUpload("document");
+  const { uploading, onBusy } = useUploadsInFlight();
   // With the renter type off, every renter is a resident.
   const residentType = f("residentType").on ? form.residentType : "local";
   const documentOptions = useDocumentOptions(residentType);
@@ -67,7 +72,9 @@ export function RenterForm({ onDone }: { onDone: (renter: Renter) => void }) {
               ...(form.emergencyName ? { emergencyContact: { name: form.emergencyName, phone: form.emergencyPhone || undefined, relation: form.emergencyRelation || undefined } } : {}),
               notes: form.notes,
             }),
-            documents: form.documentNumber ? [{ type: documentType, number: form.documentNumber, verified: canVerify && form.verified }] : [],
+            documents: form.documentNumber
+              ? [{ type: documentType, number: form.documentNumber, ...(scan ? { file: scan } : {}), verified: canVerify && form.verified }]
+              : [],
             customFields: customFieldsPayload(customFields, custom),
           },
           {
@@ -127,6 +134,18 @@ export function RenterForm({ onDone }: { onDone: (renter: Renter) => void }) {
         <Field label="Document number" error={issue("documents[0].number")}>
           {(id) => <Input id={id} value={form.documentNumber} onChange={(e) => set({ documentNumber: e.target.value })} />}
         </Field>
+        <div className="col-span-2">
+          <FilePicker
+            label="Scan or photo"
+            upload={uploadScan}
+            value={scan}
+            onChange={setScan}
+            onBusy={onBusy}
+            accept={DOCUMENT_ACCEPT}
+            hint="JPG, PNG or PDF. Kept with the profile; only staff who can see renters can open it."
+            error={issue("documents[0].file") ?? issue("documents[0].file.publicId")}
+          />
+        </div>
         {canVerify && (
           <div className="col-span-2">
             <Checkbox label="I've checked the original document" checked={form.verified} onChange={(verified) => set({ verified })} />
@@ -154,20 +173,23 @@ export function RenterForm({ onDone }: { onDone: (renter: Renter) => void }) {
       )}
       <ErrorNote error={create.error} />
       <div className="flex justify-end border-t border-line pt-4">
-        <Button type="submit" variant="primary" disabled={create.isPending}>
-          Register renter
+        <Button type="submit" variant="primary" disabled={create.isPending || uploading}>
+          {uploading ? "Uploading…" : "Register renter"}
         </Button>
       </div>
     </form>
   );
 }
 
-/** Adds a document to a renter's profile (POST /renters/:id/documents). */
+/** Adds a document, with its scan, to a renter's profile (POST /renters/:id/documents). */
 export function AddDocumentForm({ renter }: { renter: Renter }) {
   const { can } = useWorkspace();
   const canVerify = can("renters:documents:verify");
   const options = useDocumentOptions(renter.residentType);
   const [form, setForm] = useState({ type: "", number: "", verified: canVerify });
+  const [scan, setScan] = useState<UploadedFile | null>(null);
+  const uploadScan = useFileUpload("document");
+  const { uploading, onBusy } = useUploadsInFlight();
   const add = useTenantMutation((request, body: unknown) => request<Renter>("POST", `/renters/${renter.id}/documents`, body));
   const type = form.type || options[0]?.key || "";
 
@@ -177,11 +199,12 @@ export function AddDocumentForm({ renter }: { renter: Renter }) {
       onSubmit={(event) => {
         event.preventDefault();
         add.mutate(
-          { type, number: form.number, verified: canVerify && form.verified },
+          { type, number: form.number, ...(scan ? { file: scan } : {}), verified: canVerify && form.verified },
           {
             onSuccess: () => {
               toast.success("Document added");
               setForm({ type: "", number: "", verified: canVerify });
+              setScan(null);
             },
           },
         );
@@ -203,11 +226,33 @@ export function AddDocumentForm({ renter }: { renter: Renter }) {
       </Field>
       <div className="flex flex-col justify-end gap-2">
         {canVerify && <Checkbox label="Checked the original" checked={form.verified} onChange={(verified) => setForm({ ...form, verified })} />}
-        <Button type="submit" variant="dark" disabled={add.isPending}>
+        <Button type="submit" variant="dark" disabled={add.isPending || uploading}>
           Add document
         </Button>
       </div>
+      <div className="sm:col-span-3">
+        <FilePicker label="Scan or photo" upload={uploadScan} value={scan} onChange={setScan} onBusy={onBusy} accept={DOCUMENT_ACCEPT} error={add.error?.issueFor("file")} />
+      </div>
       <ErrorNote error={add.error} className="sm:col-span-3" />
     </form>
+  );
+}
+
+/** Attaches a scan to a document recorded without one, or replaces it (PUT /renters/:id/documents/:documentId/file). */
+export function AttachScan({ renter, document }: { renter: Renter; document: RenterDocument }) {
+  const uploadScan = useFileUpload("document");
+  const attach = useTenantMutation((request, file: UploadedFile) => request<Renter>("PUT", `/renters/${renter.id}/documents/${document.id}/file`, { file }));
+  return (
+    <div className="w-44">
+      <FilePicker
+        compact
+        label={document.file ? "Replace scan" : "Attach scan"}
+        upload={uploadScan}
+        value={null}
+        onChange={(file) => file && attach.mutate(file, { onSuccess: () => toast.success(document.file ? "Scan replaced" : "Scan attached") })}
+        accept={DOCUMENT_ACCEPT}
+        error={attach.error?.message}
+      />
+    </div>
   );
 }

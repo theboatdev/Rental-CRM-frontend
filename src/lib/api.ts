@@ -4,7 +4,7 @@ import { useAuth } from "@clerk/nextjs";
 import { useCallback } from "react";
 import type { ApiIssue } from "./contract";
 
-const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000/api/v1").replace(/\/+$/, "");
+export const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000/api/v1").replace(/\/+$/, "");
 
 /** An error response from the tenant API: `{ error: { code, message, issues? } }`. */
 export class ApiError extends Error {
@@ -24,7 +24,7 @@ export class ApiError extends Error {
   }
 }
 
-export type HttpMethod = "GET" | "POST" | "PATCH" | "DELETE";
+export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 export type ApiRequest = <T>(method: HttpMethod, path: string, body?: unknown) => Promise<T>;
 
 /**

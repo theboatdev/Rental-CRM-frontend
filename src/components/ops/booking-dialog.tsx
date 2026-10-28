@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { CustomFieldInputs, customFieldsPayload, draftOf, useFields, withoutOff } from "@/components/ops/fields";
-import { InspectionChecklist } from "@/components/ops/inspection-checklist";
+import { useUploadsInFlight } from "@/components/ops/files";
+import { InspectionChecklist, photosPayload, type InspectionPhotos } from "@/components/ops/inspection-checklist";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Checkbox, Field, Input, Select, Textarea, numberOrUndefined } from "@/components/ui/field";
@@ -48,6 +49,8 @@ export function BookingDialog({ defaults, onClose, onBooked }: { defaults: Booki
   const [advanceCustom, setAdvanceCustom] = useState(() => draftOf(paymentFields));
   const [handOver, setHandOver] = useState(false);
   const [checkedPoints, setCheckedPoints] = useState<string[]>([]);
+  const [photos, setPhotos] = useState<InspectionPhotos>({});
+  const { uploading, onBusy } = useUploadsInFlight();
   const availability = useAvailability(form.startDate, form.endDate);
   const book = useTenantMutation((request, body: unknown) => request<RentalDetail>("POST", "/rentals", body));
 
@@ -82,7 +85,7 @@ export function BookingDialog({ defaults, onClose, onBooked }: { defaults: Booki
             }
           : {}),
         customFields: customFieldsPayload(rentalFields, custom),
-        ...(canHandOver && handOver ? { pickup: { checkedPoints } } : {}),
+        ...(canHandOver && handOver ? { pickup: { checkedPoints, photos: photosPayload(photos) } } : {}),
       },
       {
         onSuccess: (rental) => {
@@ -252,7 +255,16 @@ export function BookingDialog({ defaults, onClose, onBooked }: { defaults: Booki
         {canHandOver && (
           <div className="space-y-2">
             <Checkbox label="Hand the vehicle over now (the renter is here)" checked={handOver} onChange={setHandOver} />
-            {handOver && <InspectionChecklist checked={checkedPoints} onChange={setCheckedPoints} required={config.modules.rentals.requirePickupInspection} />}
+            {handOver && (
+              <InspectionChecklist
+                checked={checkedPoints}
+                onChange={setCheckedPoints}
+                photos={photos}
+                onPhotosChange={setPhotos}
+                onBusy={onBusy}
+                required={config.modules.rentals.requirePickupInspection}
+              />
+            )}
           </div>
         )}
 
@@ -268,7 +280,7 @@ export function BookingDialog({ defaults, onClose, onBooked }: { defaults: Booki
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button type="submit" variant="primary" disabled={book.isPending || days < 1 || !chosen?.available}>
+          <Button type="submit" variant="primary" disabled={book.isPending || uploading || days < 1 || !chosen?.available}>
             {handOver && canHandOver ? "Book and hand over" : "Confirm booking"}
           </Button>
         </div>

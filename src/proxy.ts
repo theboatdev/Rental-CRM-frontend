@@ -1,10 +1,11 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
-const isPublicRoute = createRouteMatcher(["/sign-in(.*)", "/sign-up(.*)"]);
+// /book/<slug> is the public guest booking page.
+const isPublicRoute = createRouteMatcher(["/sign-in(.*)", "/sign-up(.*)", "/book(.*)"]);
 
 /**
- * Everything except sign-in and sign-up (accepting an invitation) needs an
- * active session. Personal accounts are off in Clerk, so a session only
+ * Everything except sign-in, sign-up (accepting an invitation) and the guest
+ * booking page needs an active session. Personal accounts are off in Clerk, so a session only
  * becomes active once the user has picked one of their organizations (their
  * company's workspace). Until then it's pending, counts as signed out here,
  * and Clerk's sign-in page asks them to choose one. The backend checks the
