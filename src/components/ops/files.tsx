@@ -18,8 +18,8 @@ export function useUploadsInFlight() {
 
 /**
  * Picks a file and uploads it at once with `upload` (e.g. useFileUpload),
- * then hands the upload to `onChange`. With `photo`, phones open the camera
- * and the picked image shows as a thumbnail.
+ * then hands the upload to `onChange`. With `photo`, the picked image shows
+ * as a thumbnail and phones open the camera, unless `camera` is false.
  */
 export function FilePicker({
   label,
@@ -29,6 +29,7 @@ export function FilePicker({
   onBusy,
   accept,
   photo = false,
+  camera = photo,
   required = false,
   hint,
   error,
@@ -41,6 +42,7 @@ export function FilePicker({
   onBusy?: (busy: boolean) => void;
   accept: string;
   photo?: boolean;
+  camera?: boolean;
   required?: boolean;
   hint?: string;
   error?: string;
@@ -103,7 +105,7 @@ export function FilePicker({
         >
           {status.uploading ? <Loader2 size={14} className="animate-spin" /> : <Icon size={14} />}
           {status.uploading ? `Uploading ${status.name ?? ""}…` : compact ? label : photo ? "Take or choose a photo" : "Choose a file"}
-          <input id={id} type="file" className="sr-only" accept={accept} {...(photo ? { capture: "environment" as const } : {})} onChange={(e) => { void pick(e.target.files?.[0]); e.target.value = ""; }} />
+          <input id={id} type="file" className="sr-only" accept={accept} {...(camera ? { capture: "environment" as const } : {})} onChange={(e) => { void pick(e.target.files?.[0]); e.target.value = ""; }} />
         </label>
       )}
       {status.failure && (

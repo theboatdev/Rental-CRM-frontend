@@ -90,7 +90,7 @@ function VehicleCard({ vehicle, onOpen }: { vehicle: VehicleWithStats; onOpen: (
       <div>
         <div className="relative h-44 overflow-hidden border-b border-line bg-paper">
           {listed("thumbnail") && vehicle.thumbnail ? (
-            // Vehicle photos are arbitrary https URLs entered by staff, so they aren't routed through next/image.
+            // Vehicle photos are Cloudinary links, or https URLs typed in before photo uploads, so they aren't routed through next/image.
             // eslint-disable-next-line @next/next/no-img-element
             <img src={vehicle.thumbnail} alt={`${vehicle.make} ${vehicle.model}`} className="size-full object-cover" />
           ) : (

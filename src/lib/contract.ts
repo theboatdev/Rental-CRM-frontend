@@ -216,7 +216,7 @@ export interface FileView {
   uploadedAt: string | null;
 }
 
-export type FileKind = "document" | "inspection" | "bill";
+export type FileKind = "document" | "inspection" | "bill" | "vehiclePhoto";
 
 /** POST /uploads: the fields of a signed upload, posted to Cloudinary together with the file. */
 export interface UploadSignature {

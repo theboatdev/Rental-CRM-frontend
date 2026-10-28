@@ -1,15 +1,86 @@
 "use client";
 
+import { X } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { CustomFieldInputs, customFieldsPayload, draftOf, useFields, withoutOff } from "@/components/ops/fields";
+import { FilePicker, useUploadsInFlight } from "@/components/ops/files";
 import { FUEL_LABELS, TRANSMISSION_LABELS } from "@/components/ops/status";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Select, Textarea, numberOrUndefined } from "@/components/ui/field";
 import { ErrorNote } from "@/components/ui/page";
-import type { FuelType, Transmission, Vehicle } from "@/lib/contract";
+import type { FuelType, Transmission, UploadedFile, Vehicle } from "@/lib/contract";
 import { useTenantMutation } from "@/lib/queries";
+import { PHOTO_ACCEPT, useFileUpload } from "@/lib/uploads";
 import { useWorkspace } from "@/lib/workspace";
+
+/**
+ * The vehicle's photo: the saved one, which can be removed, and a picker
+ * that uploads a new one. `value` is undefined to keep the saved photo, null
+ * to remove it, or the new upload.
+ */
+function PhotoInput({
+  label,
+  required,
+  hint,
+  error,
+  saved,
+  value,
+  onChange,
+  onBusy,
+}: {
+  label: string;
+  required: boolean;
+  hint?: string;
+  error?: string;
+  saved: string | null;
+  value: UploadedFile | null | undefined;
+  onChange: (value: UploadedFile | null | undefined) => void;
+  onBusy: (busy: boolean) => void;
+}) {
+  const upload = useFileUpload("vehiclePhoto");
+  const showSaved = Boolean(saved) && value === undefined;
+  return (
+    <div>
+      <p className="mb-1.5 block text-xs font-medium text-ink">
+        {label}
+        {required && <span className="text-rose-700"> *</span>}
+      </p>
+      {showSaved && (
+        <div className="mb-2 flex items-center gap-3">
+          {/* A Cloudinary link, or an https URL typed in before photo uploads, so it isn't routed through next/image. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={saved!} alt="" className="h-16 w-24 shrink-0 rounded border border-line object-cover" />
+          <button type="button" onClick={() => onChange(null)} className="flex items-center gap-0.5 text-xs font-semibold text-muted hover:text-ink">
+            <X size={12} /> Remove photo
+          </button>
+        </div>
+      )}
+      {saved && value === null && (
+        <p className="mb-2 text-xs text-muted">
+          The photo is removed when you save.{" "}
+          <button type="button" onClick={() => onChange(undefined)} className="font-semibold text-ink underline">
+            Keep it
+          </button>
+        </p>
+      )}
+      <FilePicker
+        compact
+        photo
+        camera={false}
+        label={showSaved ? "Replace photo" : "Choose a photo"}
+        upload={upload}
+        value={value ?? null}
+        // Removing a new upload goes back to the saved photo.
+        onChange={(file) => onChange(file ?? undefined)}
+        onBusy={onBusy}
+        accept={PHOTO_ACCEPT}
+        hint={hint ?? "Shown in the fleet list and on the booking page."}
+        error={error}
+      />
+    </div>
+  );
+}
 
 /**
  * Adds a vehicle (POST /vehicles) or edits one (PATCH /vehicles/:id). Status
@@ -31,9 +102,11 @@ export function VehicleForm({ vehicle, onDone }: { vehicle?: Vehicle; onDone: (s
     secondaryDailyRate: vehicle?.secondaryDailyRate ? String(vehicle.secondaryDailyRate) : "",
     depositAmount: vehicle ? String(vehicle.depositAmount) : "",
     mileage: vehicle ? String(vehicle.mileage) : "",
-    thumbnail: vehicle?.thumbnail ?? "",
     notes: vehicle?.notes ?? "",
   });
+  const [savedPhoto, setSavedPhoto] = useState(vehicle?.thumbnail ?? null);
+  const [photo, setPhoto] = useState<UploadedFile | null | undefined>(undefined);
+  const { uploading, onBusy } = useUploadsInFlight();
   const [initialCustom, setInitialCustom] = useState(() => draftOf(customFields, vehicle?.customFields));
   const [custom, setCustom] = useState(initialCustom);
   const save = useTenantMutation((request, body: unknown) =>
@@ -60,7 +133,7 @@ export function VehicleForm({ vehicle, onDone }: { vehicle?: Vehicle; onDone: (s
               dailyRate: numberOrUndefined(form.dailyRate),
               ...(form.depositAmount !== "" ? { depositAmount: numberOrUndefined(form.depositAmount) } : {}),
               ...(form.mileage !== "" ? { mileage: numberOrUndefined(form.mileage) } : {}),
-              thumbnail: form.thumbnail.trim() || null,
+              ...(photo !== undefined ? { thumbnail: photo } : {}),
               notes: form.notes,
             }),
             ...(showSecondary ? { secondaryDailyRate: numberOrUndefined(form.secondaryDailyRate) ?? null } : {}),
@@ -71,6 +144,8 @@ export function VehicleForm({ vehicle, onDone }: { vehicle?: Vehicle; onDone: (s
               toast.success(vehicle ? `${saved.plateNumber} updated` : `${saved.plateNumber} added to the fleet`);
               // The form stays open in the dossier, so later edits compare against what was saved.
               setInitialCustom(draftOf(customFields, saved.customFields));
+              setSavedPhoto(saved.thumbnail);
+              setPhoto(undefined);
               onDone(saved);
             },
           },
@@ -148,9 +223,16 @@ export function VehicleForm({ vehicle, onDone }: { vehicle?: Vehicle; onDone: (s
         )}
       </div>
       {f("thumbnail").on && (
-        <Field label={f("thumbnail").label} hint={f("thumbnail").help} error={issue("thumbnail")}>
-          {(id) => <Input id={id} type="url" required={f("thumbnail").required} placeholder="https://…" value={form.thumbnail} onChange={(e) => set({ thumbnail: e.target.value })} />}
-        </Field>
+        <PhotoInput
+          label={f("thumbnail").label}
+          required={f("thumbnail").required}
+          hint={f("thumbnail").help}
+          error={issue("thumbnail")}
+          saved={savedPhoto}
+          value={photo}
+          onChange={setPhoto}
+          onBusy={onBusy}
+        />
       )}
       {f("notes").on && (
         <Field label={f("notes").label} hint={f("notes").help} error={issue("notes")}>
@@ -164,8 +246,8 @@ export function VehicleForm({ vehicle, onDone }: { vehicle?: Vehicle; onDone: (s
       )}
       <ErrorNote error={save.error} />
       <div className="flex justify-end gap-2 border-t border-line pt-4">
-        <Button type="submit" variant="primary" disabled={save.isPending}>
-          {vehicle ? "Save changes" : "Add vehicle"}
+        <Button type="submit" variant="primary" disabled={save.isPending || uploading}>
+          {uploading ? "Uploading…" : vehicle ? "Save changes" : "Add vehicle"}
         </Button>
       </div>
     </form>
