@@ -118,7 +118,10 @@ function Rentals() {
                       </div>
                     </td>
                     <td className={`${table.td} text-right font-semibold text-ink`}>{format.money(r.totalAmount)}</td>
-                    <td className={`${table.td} text-right ${r.balance > 0 && r.status !== "CANCELLED" ? "font-semibold text-rose-700" : "text-muted"}`}>{format.money(r.balance)}</td>
+                    <td className={`${table.td} text-right ${r.balance > 0 && r.status !== "CANCELLED" ? "font-semibold text-rose-700" : "text-muted"}`}>
+                      {format.money(r.balance)}
+                      {r.fullPayment && <div className="text-xs font-semibold whitespace-nowrap text-emerald-700">Paid in full</div>}
+                    </td>
                     <td className={`${table.td} text-center`}>
                       {r.pickupInspection ? (
                         <span className="inline-flex items-center gap-1 text-xs font-semibold">

@@ -168,7 +168,7 @@ export function RenterForm({ onDone }: { onDone: (renter: Renter) => void }) {
       )}
       {customFields.length > 0 && (
         <div className="grid grid-cols-2 gap-3">
-          <CustomFieldInputs fields={customFields} draft={custom} onChange={setCustom} issue={issue} />
+          <CustomFieldInputs section="renters" fields={customFields} draft={custom} onChange={setCustom} onBusy={onBusy} issue={issue} />
         </div>
       )}
       <ErrorNote error={create.error} />

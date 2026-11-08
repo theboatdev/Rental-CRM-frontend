@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { CustomFieldInputs, customFieldsPayload, draftOf, useFields, withoutOff } from "@/components/ops/fields";
+import { useUploadsInFlight } from "@/components/ops/files";
 import { PAYMENT_TYPE_LABELS } from "@/components/ops/status";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Select, Textarea, numberOrUndefined } from "@/components/ui/field";
@@ -22,14 +23,31 @@ const TYPES_FOR: Record<Rental["status"], PaymentType[]> = {
 /**
  * Records a payment against one rental (POST /payments). The backend checks
  * the amount against what's owed or paid. Labels and which fields show come
- * from the config's `fields.payments`.
+ * from the config's `fields.payments`. `types` overrides the payment types
+ * offered (the first is the default), and `defaultAmount` prefills the amount.
  */
-export function PaymentForm({ rental, onDone }: { rental: Pick<Rental, "id" | "code" | "status" | "balance" | "paidAmount">; onDone?: (payment: Payment) => void }) {
+export function PaymentForm({
+  rental,
+  onDone,
+  types = TYPES_FOR[rental.status],
+  defaultAmount,
+}: {
+  rental: Pick<Rental, "id" | "code" | "status" | "balance" | "paidAmount">;
+  onDone?: (payment: Payment) => void;
+  types?: PaymentType[];
+  defaultAmount?: number;
+}) {
   const { config, options, format } = useWorkspace();
-  const types = TYPES_FOR[rental.status];
-  const [form, setForm] = useState({ type: types[0], method: options("paymentMethods")[0]?.key ?? "", amount: "", transactionReference: "", notes: "" });
+  const [form, setForm] = useState({
+    type: types[0],
+    method: options("paymentMethods")[0]?.key ?? "",
+    amount: defaultAmount ? String(defaultAmount) : "",
+    transactionReference: "",
+    notes: "",
+  });
   const { builtIn: f, custom: customFields } = useFields("payments");
   const [custom, setCustom] = useState(() => draftOf(customFields));
+  const { uploading, onBusy } = useUploadsInFlight();
   const record = useTenantMutation((request, body: unknown) => request<Payment>("POST", "/payments", body));
   const issue = (path: string) => record.error?.issueFor(path);
 
@@ -97,11 +115,11 @@ export function PaymentForm({ rental, onDone }: { rental: Pick<Rental, "id" | "c
           {(id) => <Textarea id={id} required={f("notes").required} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />}
         </Field>
       )}
-      <CustomFieldInputs fields={customFields} draft={custom} onChange={setCustom} issue={issue} />
+      <CustomFieldInputs section="payments" fields={customFields} draft={custom} onChange={setCustom} onBusy={onBusy} issue={issue} />
       <ErrorNote error={record.error} className="sm:col-span-2" />
       <div className="flex justify-end sm:col-span-2">
-        <Button type="submit" variant="primary" disabled={record.isPending}>
-          Record payment
+        <Button type="submit" variant="primary" disabled={record.isPending || uploading}>
+          {uploading ? "Uploading…" : "Record payment"}
         </Button>
       </div>
     </form>

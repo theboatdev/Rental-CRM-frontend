@@ -20,12 +20,16 @@ export function useUploadsInFlight() {
  * Picks a file and uploads it at once with `upload` (e.g. useFileUpload),
  * then hands the upload to `onChange`. With `photo`, the picked image shows
  * as a thumbnail and phones open the camera, unless `camera` is false.
+ * `current` is the file the record already has, shown until it's replaced
+ * (a new upload goes to `onChange`) or removed (`onRemoveCurrent`).
  */
 export function FilePicker({
   label,
   upload,
   value,
   onChange,
+  current = null,
+  onRemoveCurrent,
   onBusy,
   accept,
   photo = false,
@@ -39,6 +43,8 @@ export function FilePicker({
   upload: (file: File) => Promise<UploadedFile>;
   value: UploadedFile | null;
   onChange: (file: UploadedFile | null) => void;
+  current?: FileView | null;
+  onRemoveCurrent?: () => void;
   onBusy?: (busy: boolean) => void;
   accept: string;
   photo?: boolean;
@@ -73,6 +79,9 @@ export function FilePicker({
     setStatus({ uploading: false });
   };
   const Icon = photo ? Camera : Paperclip;
+  const input = (
+    <input id={id} type="file" className="sr-only" accept={accept} {...(camera ? { capture: "environment" as const } : {})} onChange={(e) => { void pick(e.target.files?.[0]); e.target.value = ""; }} />
+  );
 
   return (
     <div>
@@ -98,6 +107,37 @@ export function FilePicker({
             <X size={12} /> Remove
           </button>
         </div>
+      ) : current && !status.uploading ? (
+        <div className="flex min-h-10 items-center gap-2 rounded-md border border-line px-3 py-1.5 text-xs text-ink">
+          {photo && current.url ? (
+            <a href={current.url} target="_blank" rel="noopener noreferrer" className="shrink-0" title={`Open ${label}`}>
+              {/* An expiring Cloudinary link, which next/image can't optimize. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={current.url} alt="" className="size-8 rounded object-cover" />
+            </a>
+          ) : (
+            <FileText size={14} className="shrink-0 text-muted" />
+          )}
+          <span className="min-w-0 flex-1 truncate">
+            {current.url ? (
+              <a href={current.url} target="_blank" rel="noopener noreferrer" className="font-semibold text-brand underline">
+                On file
+              </a>
+            ) : (
+              "On file"
+            )}{" "}
+            · {current.format.toUpperCase()} · {formatBytes(current.bytes)}
+          </span>
+          <label htmlFor={id} className="shrink-0 cursor-pointer font-semibold text-muted hover:text-ink">
+            Replace
+            {input}
+          </label>
+          {onRemoveCurrent && (
+            <button type="button" onClick={onRemoveCurrent} className="flex shrink-0 items-center gap-0.5 font-semibold text-muted hover:text-ink" aria-label={`Remove ${label}`}>
+              <X size={12} /> Remove
+            </button>
+          )}
+        </div>
       ) : (
         <label
           htmlFor={id}
@@ -105,7 +145,7 @@ export function FilePicker({
         >
           {status.uploading ? <Loader2 size={14} className="animate-spin" /> : <Icon size={14} />}
           {status.uploading ? `Uploading ${status.name ?? ""}…` : compact ? label : photo ? "Take or choose a photo" : "Choose a file"}
-          <input id={id} type="file" className="sr-only" accept={accept} {...(camera ? { capture: "environment" as const } : {})} onChange={(e) => { void pick(e.target.files?.[0]); e.target.value = ""; }} />
+          {input}
         </label>
       )}
       {status.failure && (

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { BadgeCheck, FileDown, Loader2 } from "lucide-react";
+import { useId, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { CustomFieldList, CustomFieldsEditor, useFields } from "@/components/ops/fields";
 import { PhotoThumb, useUploadsInFlight } from "@/components/ops/files";
@@ -9,8 +10,9 @@ import { PaymentForm } from "@/components/ops/payment-form";
 import { PAYMENT_TYPE_LABELS, RentalStatusBadge } from "@/components/ops/status";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
-import { Field, Input, Textarea, numberOrUndefined } from "@/components/ui/field";
+import { Checkbox, Field, Input, Textarea, numberOrUndefined } from "@/components/ui/field";
 import { Badge, ErrorNote, Loading, table } from "@/components/ui/page";
+import { useApiDownload } from "@/lib/api";
 import type { Inspection, RentalDetail } from "@/lib/contract";
 import { useRental, useTenantMutation } from "@/lib/queries";
 import { useWorkspace } from "@/lib/workspace";
@@ -30,17 +32,29 @@ export function RentalDialog({ rentalId, onClose }: { rentalId: string; onClose:
 }
 
 function RentalDetails({ rental, onClose }: { rental: RentalDetail; onClose: () => void }) {
-  const { can, moduleOn, format, label } = useWorkspace();
+  const { config, can, moduleOn, format, label } = useWorkspace();
   const { builtIn: f, custom: customFields } = useFields("rentals");
   const [panel, setPanel] = useState<Panel>(null);
-  const cancel =useTenantMutation((request) => request<RentalDetail>("POST", `/rentals/${rental.id}/cancel`));
+  const cancel = useTenantMutation((request) => request<RentalDetail>("POST", `/rentals/${rental.id}/cancel`));
+  const confirmPaid = useTenantMutation((request) => request<RentalDetail>("POST", `/rentals/${rental.id}/full-payment`));
   const canPay = moduleOn("payments") && can("payments:record");
+  // After the hand-over, the full payment can still be confirmed once nothing is owed (the ledger has to agree when payments are on).
+  const canConfirmPaid =
+    !rental.fullPayment &&
+    (rental.status === "ACTIVE" || rental.status === "COMPLETED") &&
+    (can("rentals:checkin") || can("payments:record")) &&
+    (!moduleOn("payments") || rental.balance <= 0);
   const toggle = (next: Panel) => setPanel((current) => (current === next ? null : next));
 
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-2">
         <RentalStatusBadge rental={rental} />
+        {rental.fullPayment && (
+          <Badge tone="green">
+            <BadgeCheck size={12} className="mr-1" aria-hidden /> Full amount paid
+          </Badge>
+        )}
         {rental.bookingCode && <Badge tone="muted">Booked as {rental.bookingCode}</Badge>}
         <Badge tone="muted">{rental.source === "ONLINE" ? "Guest portal" : "Counter"}</Badge>
       </div>
@@ -63,6 +77,14 @@ function RentalDetails({ rental, onClose }: { rental: RentalDetail; onClose: () 
         <Item label="Outstanding">
           <span className={rental.balance > 0 ? "font-semibold text-rose-700" : "text-emerald-700"}>{format.money(rental.balance)}</span>
         </Item>
+        {rental.fullPayment && (
+          <Item label="Full payment">
+            <span className="text-emerald-700">
+              Confirmed {format.dateTime(rental.fullPayment.at)}
+              {rental.fullPayment.by ? ` by ${rental.fullPayment.by.name}` : ""}
+            </span>
+          </Item>
+        )}
         {rental.distance !== null && <Item label="Driven">{format.distance(rental.distance)}</Item>}
         {f("notes").on && rental.notes && <Item label={f("notes").label}>{rental.notes}</Item>}
         <CustomFieldList section="rentals" values={rental.customFields} />
@@ -89,11 +111,24 @@ function RentalDetails({ rental, onClose }: { rental: RentalDetail; onClose: () 
             Record payment
           </Button>
         )}
+        {canConfirmPaid && (
+          <Button
+            variant="outline"
+            disabled={confirmPaid.isPending}
+            onClick={() => {
+              if (!confirm(`Confirm that ${rental.renter.fullName} has paid the full amount for ${rental.code}?`)) return;
+              confirmPaid.mutate(undefined, { onSuccess: (updated) => toast.success(`${updated.code} confirmed as paid in full`) });
+            }}
+          >
+            <BadgeCheck size={14} /> Confirm full payment
+          </Button>
+        )}
         {can("rentals:create") && (f("notes").on || customFields.length > 0) && (
           <Button variant="outline" onClick={() => toggle("details")}>
             Edit details
           </Button>
         )}
+        {rental.status === "COMPLETED" && config.documents?.returnReceipt.enabled && <ReturnReceiptButton rental={rental} />}
         {rental.status === "RESERVED" && can("rentals:cancel") && (
           <Button
             variant="danger"
@@ -108,6 +143,7 @@ function RentalDetails({ rental, onClose }: { rental: RentalDetail; onClose: () 
         )}
       </div>
       <ErrorNote error={cancel.error} />
+      <ErrorNote error={confirmPaid.error} />
 
       {panel === "checkin" && <HandoverForm rental={rental} kind="checkin" onDone={() => setPanel(null)} />}
       {panel === "return" && <HandoverForm rental={rental} kind="return" onDone={() => setPanel(null)} />}
@@ -164,9 +200,44 @@ function RentalDetails({ rental, onClose }: { rental: RentalDetail; onClose: () 
   );
 }
 
-/** Check-in (pickup inspection, odometer defaults to the vehicle's) or return (odometer required, drop inspection). */
+/**
+ * Downloads the return receipt: the PDF bill for the renter that confirms
+ * the vehicle came back, with everything these details show. The backend
+ * makes it, as the tenant's `documents.returnReceipt` config sets it up.
+ */
+function ReturnReceiptButton({ rental }: { rental: RentalDetail }) {
+  const download = useApiDownload();
+  const [pending, setPending] = useState(false);
+  return (
+    <Button
+      variant="outline"
+      disabled={pending}
+      onClick={async () => {
+        setPending(true);
+        try {
+          await download(`/rentals/${rental.id}/return-receipt`, `${rental.code}-return-receipt.pdf`);
+        } catch (error) {
+          toast.error(error instanceof Error ? error.message : "Couldn't download the return receipt");
+        } finally {
+          setPending(false);
+        }
+      }}
+    >
+      {pending ? <Loader2 size={14} className="animate-spin" /> : <FileDown size={14} />}
+      {pending ? "Preparing PDF…" : "Download return receipt"}
+    </Button>
+  );
+}
+
+/**
+ * Check-in (pickup inspection, odometer defaults to the vehicle's, and the
+ * full payment confirmation) or return (odometer required, drop inspection).
+ */
 function HandoverForm({ rental, kind, onDone }: { rental: RentalDetail; kind: "checkin" | "return"; onDone: () => void }) {
   const { config } = useWorkspace();
+  // The payment block holds a form of its own, so it sits outside this one; the submit button points back at it.
+  const formId = useId();
+  const [confirmFullPayment, setConfirmFullPayment] = useState(false);
   const required = kind === "checkin" ? config.modules.rentals.requirePickupInspection : config.modules.rentals.requireDropInspection;
   const [checkedPoints, setCheckedPoints] = useState<string[]>([]);
   const [photos, setPhotos] = useState<InspectionPhotos>({});
@@ -177,39 +248,122 @@ function HandoverForm({ rental, kind, onDone }: { rental: RentalDetail; kind: "c
   const submit = useTenantMutation((request, body: unknown) => request<RentalDetail>("POST", `/rentals/${rental.id}/${path}`, body));
 
   return (
-    <form
-      className="space-y-3 border border-brand/30 bg-brand/5 p-4"
-      onSubmit={(event) => {
-        event.preventDefault();
-        submit.mutate(
-          { odometer: numberOrUndefined(odometer), checkedPoints, photos: photosPayload(photos), notes },
-          {
-            onSuccess: (updated) => {
-              toast.success(kind === "checkin" ? `${updated.code} handed over` : `${updated.code} returned`);
-              onDone();
+    <div className="space-y-3 border border-brand/30 bg-brand/5 p-4">
+      <form
+        id={formId}
+        className="space-y-3"
+        onSubmit={(event) => {
+          event.preventDefault();
+          submit.mutate(
+            { odometer: numberOrUndefined(odometer), checkedPoints, photos: photosPayload(photos), notes, ...(kind === "checkin" ? { confirmFullPayment } : {}) },
+            {
+              onSuccess: (updated) => {
+                toast.success(kind === "checkin" ? `${updated.code} handed over` : `${updated.code} returned`);
+                onDone();
+              },
             },
-          },
-        );
-      }}
-    >
-      <InspectionChecklist checked={checkedPoints} onChange={setCheckedPoints} photos={photos} onPhotosChange={setPhotos} onBusy={onBusy} required={required} />
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Field
-          label={`Odometer (${config.locale.distanceUnit})`}
-          hint={kind === "checkin" ? "Leave empty to use the vehicle's last reading" : rental.startMileage !== null ? `At pickup: ${rental.startMileage}` : undefined}
-          error={submit.error?.issueFor("odometer")}
-        >
-          {(id) => <Input id={id} type="number" min="0" required={kind === "return"} value={odometer} onChange={(e) => setOdometer(e.target.value)} />}
-        </Field>
-        <Field label="Notes (damage, fuel level)">{(id) => <Textarea id={id} value={notes} onChange={(e) => setNotes(e.target.value)} />}</Field>
-      </div>
+          );
+        }}
+      >
+        <InspectionChecklist checked={checkedPoints} onChange={setCheckedPoints} photos={photos} onPhotosChange={setPhotos} onBusy={onBusy} required={required} />
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field
+            label={`Odometer (${config.locale.distanceUnit})`}
+            hint={kind === "checkin" ? "Leave empty to use the vehicle's last reading" : rental.startMileage !== null ? `At pickup: ${rental.startMileage}` : undefined}
+            error={submit.error?.issueFor("odometer")}
+          >
+            {(id) => <Input id={id} type="number" min="0" required={kind === "return"} value={odometer} onChange={(e) => setOdometer(e.target.value)} />}
+          </Field>
+          <Field label="Notes (damage, fuel level)">{(id) => <Textarea id={id} value={notes} onChange={(e) => setNotes(e.target.value)} />}</Field>
+        </div>
+      </form>
+      {kind === "checkin" && (
+        <PaymentAtPickup rental={rental} confirmed={confirmFullPayment} onConfirmedChange={setConfirmFullPayment} error={submit.error?.issueFor("confirmFullPayment")} />
+      )}
       <ErrorNote error={submit.error} />
       <div className="flex justify-end">
-        <Button type="submit" variant={kind === "checkin" ? "primary" : "success"} disabled={submit.isPending || uploading}>
+        <Button type="submit" form={formId} variant={kind === "checkin" ? "primary" : "success"} disabled={submit.isPending || uploading}>
           {uploading ? "Uploading photos…" : kind === "checkin" ? "Confirm hand-over" : "Confirm return"}
         </Button>
       </div>
-    </form>
+    </div>
+  );
+}
+
+/**
+ * The hand-over's payment check: what's still owed, a way to record it on
+ * the spot, and the "Full amount paid" confirmation. With the payments
+ * module on, the confirmation needs nothing owed (the backend checks too);
+ * without it, it's staff's word.
+ */
+function PaymentAtPickup({
+  rental,
+  confirmed,
+  onConfirmedChange,
+  error,
+}: {
+  rental: RentalDetail;
+  confirmed: boolean;
+  onConfirmedChange: (confirmed: boolean) => void;
+  error?: string;
+}) {
+  const { format, moduleOn, can } = useWorkspace();
+  const [collecting, setCollecting] = useState(false);
+  const ledger = moduleOn("payments");
+  const owed = rental.balance;
+  const blocked = ledger && owed > 0;
+
+  return (
+    <div className="space-y-2 border-t border-brand/20 pt-3">
+      <p className="font-semibold tracking-normal text-ink">Payment</p>
+      {ledger &&
+        (owed > 0 ? (
+          <p className="text-xs text-ink">
+            <span className="font-semibold text-rose-700">{format.money(owed)}</span> is still to be paid: the rental and deposit, less {format.money(rental.paidAmount)}{" "}
+            paid.{" "}
+            {can("payments:record") ? (
+              <button type="button" className="font-semibold text-brand underline" onClick={() => setCollecting((open) => !open)}>
+                {collecting ? "Not now" : "Record it now"}
+              </button>
+            ) : (
+              "Someone who records payments needs to take it first."
+            )}
+          </p>
+        ) : (
+          <p className="text-xs text-emerald-700">Nothing is owed: {format.money(rental.paidAmount)} paid.</p>
+        ))}
+      {collecting && blocked && (
+        <div className="border border-line bg-panel p-3">
+          <PaymentForm
+            rental={rental}
+            types={["RENTAL", "DEPOSIT"]}
+            defaultAmount={owed}
+            onDone={(payment) => {
+              setCollecting(false);
+              // Paying off what was owed is the usual reason to record it here.
+              if (payment.amount >= owed) onConfirmedChange(true);
+            }}
+          />
+        </div>
+      )}
+      <Checkbox
+        label={
+          <>
+            <span className="font-semibold">Full amount paid</span>: the renter has paid everything for this rental
+          </>
+        }
+        checked={confirmed && !blocked}
+        disabled={blocked}
+        onChange={onConfirmedChange}
+      />
+      {error ? (
+        <p role="alert" className="text-xs font-semibold text-rose-700">
+          {error}
+        </p>
+      ) : (
+        blocked && <p className="text-xs text-muted">Record what&apos;s still owed to confirm the full amount.</p>
+      )}
+    </div>
   );
 }
 

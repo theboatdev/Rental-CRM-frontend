@@ -151,7 +151,7 @@ export function CostForm({ vehicle, onDone }: { vehicle?: VehicleRef; onDone?: (
           {(id) => <Textarea id={id} required={f("notes").required} value={form.notes} onChange={(e) => set({ notes: e.target.value })} />}
         </Field>
       )}
-      <CustomFieldInputs fields={customFields} draft={custom} onChange={setCustom} issue={issue} />
+      <CustomFieldInputs section="costs" fields={customFields} draft={custom} onChange={setCustom} onBusy={onBusy} issue={issue} />
       <div className="sm:col-span-3">
         <FilePicker
           label="Scanned bill"

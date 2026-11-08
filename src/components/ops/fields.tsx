@@ -2,13 +2,15 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
+import { FileLink, FilePicker, PhotoThumb, useUploadsInFlight } from "@/components/ops/files";
 import { FUEL_LABELS, TRANSMISSION_LABELS } from "@/components/ops/status";
 import { Button } from "@/components/ui/button";
 import { Checkbox, Field, Input, Select, Textarea } from "@/components/ui/field";
 import { ErrorNote } from "@/components/ui/page";
-import type { CustomField, CustomFieldValues, FieldSection } from "@/lib/contract";
+import type { CustomField, CustomFieldValues, FieldSection, FileView, UploadedFile } from "@/lib/contract";
 import type { Formatters } from "@/lib/format";
 import { useTenantMutation } from "@/lib/queries";
+import { DOCUMENT_ACCEPT, PHOTO_ACCEPT, useCustomFieldUpload } from "@/lib/uploads";
 import { useWorkspace } from "@/lib/workspace";
 
 /**
@@ -51,16 +53,23 @@ export function withoutOff<T extends Record<string, unknown>>(builtIn: (key: str
   return Object.fromEntries(Object.entries(values).filter(([key]) => builtIn(key).on)) as Partial<T>;
 }
 
-/** A form's custom field values while editing: strings for inputs, booleans for checkboxes. */
-export type CustomFieldDraft = Record<string, string | boolean>;
+/** A file field while editing: the file the record has, one just uploaded to go in its place, or none. */
+export type FileDraft = { stored: FileView } | { uploaded: UploadedFile } | null;
+
+/** A form's custom field values while editing: strings for inputs, booleans for checkboxes, `FileDraft`s for files. */
+export type CustomFieldDraft = Record<string, string | boolean | FileDraft>;
+
+/** Whether a stored custom value is a file. */
+export const isFileValue = (value: CustomFieldValues[string] | undefined): value is FileView => typeof value === "object" && value !== null;
 
 /** Draft values from a record's stored values, or empty ones for a new record. */
 export function draftOf(fields: CustomField[], values: CustomFieldValues = {}): CustomFieldDraft {
   return Object.fromEntries(
     fields.map((field) => {
       const value = values[field.key];
+      if (field.type === "file") return [field.key, isFileValue(value) ? { stored: value } : null];
       if (field.type === "boolean") return [field.key, value === true];
-      return [field.key, value === undefined || typeof value === "boolean" ? "" : String(value)];
+      return [field.key, value === undefined || typeof value === "boolean" || isFileValue(value) ? "" : String(value)];
     }),
   );
 }
@@ -68,13 +77,19 @@ export function draftOf(fields: CustomField[], values: CustomFieldValues = {}): 
 /**
  * The `customFields` to send. For a new record, the fields filled in. When
  * editing (with the `initial` draft), only the fields that changed, and
- * null for one that was cleared.
+ * null for one that was cleared. A new file goes as its upload response.
  */
 export function customFieldsPayload(fields: CustomField[], draft: CustomFieldDraft, initial?: CustomFieldDraft) {
-  const payload: Record<string, string | number | boolean | null> = {};
+  const payload: Record<string, string | number | boolean | UploadedFile | null> = {};
   for (const field of fields) {
     const value = draft[field.key];
     if (value === undefined || (initial && value === initial[field.key])) continue;
+    if (field.type === "file") {
+      if (value && typeof value === "object" && "uploaded" in value) payload[field.key] = value.uploaded;
+      else if (value === null && initial?.[field.key]) payload[field.key] = null;
+      continue;
+    }
+    if (value === null || typeof value === "object") continue;
     if (typeof value === "boolean") {
       if (value || initial) payload[field.key] = value;
     } else if (value.trim() === "") {
@@ -90,30 +105,52 @@ export function customFieldsPayload(fields: CustomField[], draft: CustomFieldDra
 }
 
 /**
- * One input per custom field, as siblings so they flow into the form's grid.
- * Long text and yes/no fields span the full row. `issue` looks up the API's
- * field issues; `path` is where the values sit in the request body.
+ * One input per custom field of `section`, as siblings so they flow into the
+ * form's grid. Long text, yes/no and file fields span the full row. `issue`
+ * looks up the API's field issues; `path` is where the values sit in the
+ * request body. Files upload as soon as they're picked; `onBusy` (from
+ * useUploadsInFlight) lets the form wait for them.
  */
 export function CustomFieldInputs({
+  section,
   fields,
   draft,
   onChange,
+  onBusy,
   issue,
   path = "customFields",
 }: {
+  section: FieldSection;
   fields: CustomField[];
   draft: CustomFieldDraft;
   onChange: (draft: CustomFieldDraft) => void;
+  onBusy?: (busy: boolean) => void;
   issue: (path: string) => string | undefined;
   path?: string;
 }) {
-  const set = (key: string, value: string | boolean) => onChange({ ...draft, [key]: value });
+  const set = (key: string, value: CustomFieldDraft[string]) => onChange({ ...draft, [key]: value });
 
   return fields.map((field) => {
     const error = issue(`${path}.${field.key}`);
     const value = draft[field.key];
     const label = field.required && field.type !== "boolean" ? `${field.label} *` : field.label;
     const hint = field.helpText || undefined;
+
+    if (field.type === "file") {
+      return (
+        <div key={field.key} className="col-span-full">
+          <CustomFileInput
+            section={section}
+            field={field}
+            value={value && typeof value === "object" ? value : null}
+            onChange={(next) => set(field.key, next)}
+            onBusy={onBusy}
+            hint={hint}
+            error={error}
+          />
+        </div>
+      );
+    }
 
     if (field.type === "boolean") {
       return (
@@ -163,10 +200,49 @@ export function CustomFieldInputs({
   });
 }
 
-/** A stored custom value as text: dates and numbers in the tenant's locale, option labels for choices. */
+/** One file field's input: picks and uploads a file for the field, and shows the one the record has. */
+function CustomFileInput({
+  section,
+  field,
+  value,
+  onChange,
+  onBusy,
+  hint,
+  error,
+}: {
+  section: FieldSection;
+  field: Extract<CustomField, { type: "file" }>;
+  value: FileDraft;
+  onChange: (value: FileDraft) => void;
+  onBusy?: (busy: boolean) => void;
+  hint?: string;
+  error?: string;
+}) {
+  const upload = useCustomFieldUpload(section, field.key);
+  const photo = field.accept === "images";
+  return (
+    <FilePicker
+      label={field.label}
+      upload={upload}
+      value={value && "uploaded" in value ? value.uploaded : null}
+      onChange={(file) => onChange(file ? { uploaded: file } : null)}
+      current={value && "stored" in value ? value.stored : null}
+      onRemoveCurrent={() => onChange(null)}
+      onBusy={onBusy}
+      accept={photo ? PHOTO_ACCEPT : DOCUMENT_ACCEPT}
+      photo={photo}
+      required={field.required}
+      hint={hint}
+      error={error}
+    />
+  );
+}
+
+/** A stored custom value as text: dates and numbers in the tenant's locale, option labels for choices, "Attached" for a file. */
 export function formatCustomValue(field: CustomField, value: CustomFieldValues[string] | undefined, format: Formatters): string {
   if (field.type === "boolean") return value === true ? "Yes" : "No";
   if (value === undefined || value === "") return "—";
+  if (isFileValue(value)) return field.type === "file" ? "Attached" : "—";
   if (field.type === "date" && typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) return format.day(value);
   if (field.type === "number" && typeof value === "number") return format.number(value);
   if (field.type === "select") return field.options.find((option) => option.key === value)?.label ?? String(value);
@@ -202,16 +278,31 @@ function formatBuiltIn(key: string, value: unknown, format: Formatters): string 
   }
 }
 
-/** The section's custom fields that are on and have a value on this record, as `dt`/`dd` pairs for a `dl`. */
+/** The section's custom fields that are on and have a value on this record, as `dt`/`dd` pairs for a `dl`. Image files show as a thumbnail. */
 export function CustomFieldList({ section, values }: { section: FieldSection; values: CustomFieldValues }) {
   const { format } = useWorkspace();
   const fields = useCustomFields(section).filter((field) => values[field.key] !== undefined && values[field.key] !== "");
-  return fields.map((field) => (
-    <div key={field.key}>
-      <dt className="text-xs font-semibold tracking-normal text-muted">{field.label}</dt>
-      <dd className={`text-ink ${field.type === "longText" ? "whitespace-pre-line" : ""}`}>{formatCustomValue(field, values[field.key], format)}</dd>
-    </div>
-  ));
+  return fields.map((field) => {
+    const value = values[field.key];
+    return (
+      <div key={field.key}>
+        <dt className="text-xs font-semibold tracking-normal text-muted">{field.label}</dt>
+        <dd className={`text-ink ${field.type === "longText" ? "whitespace-pre-line" : ""}`}>
+          {field.type === "file" && isFileValue(value) ? (
+            field.accept === "images" && value.url ? (
+              <div className="mt-1 w-20">
+                <PhotoThumb file={value} alt={field.label} />
+              </div>
+            ) : (
+              <FileLink file={value} label="Open" />
+            )
+          ) : (
+            formatCustomValue(field, value, format)
+          )}
+        </dd>
+      </div>
+    );
+  });
 }
 
 /** Whether any of the section's custom fields that are on has a value on this record. */
@@ -268,6 +359,7 @@ export function CustomFieldsEditor({
   const [initial, setInitial] = useState(() => draftOf(fields, values));
   const [draft, setDraft] = useState(initial);
   const [notesDraft, setNotesDraft] = useState(notes ?? "");
+  const { uploading, onBusy } = useUploadsInFlight();
   const save = useTenantMutation((request, body: unknown) => request<{ customFields: CustomFieldValues }>("PATCH", url, body));
   const issue = (path: string) => save.error?.issueFor(path);
 
@@ -284,14 +376,16 @@ export function CustomFieldsEditor({
           {
             onSuccess: (saved) => {
               toast.success("Details saved");
-              setInitial(draftOf(fields, saved.customFields));
+              const savedDraft = draftOf(fields, saved.customFields);
+              setInitial(savedDraft);
+              setDraft(savedDraft);
               onDone?.();
             },
           },
         );
       }}
     >
-      <CustomFieldInputs fields={fields} draft={draft} onChange={setDraft} issue={issue} />
+      <CustomFieldInputs section={section} fields={fields} draft={draft} onChange={setDraft} onBusy={onBusy} issue={issue} />
       {editNotes && (
         <Field label={notesField.label} hint={notesField.help} error={issue("notes")} className="col-span-full">
           {(id) => <Textarea id={id} required={notesField.required} value={notesDraft} onChange={(e) => setNotesDraft(e.target.value)} />}
@@ -299,8 +393,8 @@ export function CustomFieldsEditor({
       )}
       <ErrorNote error={save.error} className="col-span-full" />
       <div className="col-span-full flex justify-end">
-        <Button type="submit" variant="primary" disabled={save.isPending}>
-          Save details
+        <Button type="submit" variant="primary" disabled={save.isPending || uploading}>
+          {uploading ? "Uploading…" : "Save details"}
         </Button>
       </div>
     </form>

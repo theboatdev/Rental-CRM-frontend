@@ -2,7 +2,7 @@
 
 import { useCallback } from "react";
 import { useApiRequest } from "./api";
-import type { FileKind, UploadSignature, UploadedFile } from "./contract";
+import type { FieldSection, FileKind, UploadSignature, UploadedFile } from "./contract";
 
 /**
  * Files go from the browser straight to Cloudinary: the backend signs the
@@ -33,6 +33,15 @@ export async function sendToCloudinary(signed: UploadSignature, file: File): Pro
 export function useFileUpload(kind: FileKind) {
   const request = useApiRequest();
   return useCallback(async (file: File) => (await sendToCloudinary(await request<UploadSignature>("POST", "/uploads", { kind }), file)).file, [request, kind]);
+}
+
+/** Uploads the file of a `file` custom field: the upload is signed for that field, so only it can keep the file. */
+export function useCustomFieldUpload(section: FieldSection, field: string) {
+  const request = useApiRequest();
+  return useCallback(
+    async (file: File) => (await sendToCloudinary(await request<UploadSignature>("POST", "/uploads", { kind: "customField", section, field }), file)).file,
+    [request, section, field],
+  );
 }
 
 export const DOCUMENT_ACCEPT = "image/jpeg,image/png,image/webp,application/pdf";

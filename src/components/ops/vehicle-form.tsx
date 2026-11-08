@@ -143,7 +143,9 @@ export function VehicleForm({ vehicle, onDone }: { vehicle?: Vehicle; onDone: (s
             onSuccess: (saved) => {
               toast.success(vehicle ? `${saved.plateNumber} updated` : `${saved.plateNumber} added to the fleet`);
               // The form stays open in the dossier, so later edits compare against what was saved.
-              setInitialCustom(draftOf(customFields, saved.customFields));
+              const savedCustom = draftOf(customFields, saved.customFields);
+              setInitialCustom(savedCustom);
+              setCustom(savedCustom);
               setSavedPhoto(saved.thumbnail);
               setPhoto(undefined);
               onDone(saved);
@@ -241,7 +243,7 @@ export function VehicleForm({ vehicle, onDone }: { vehicle?: Vehicle; onDone: (s
       )}
       {customFields.length > 0 && (
         <div className="grid grid-cols-2 gap-3">
-          <CustomFieldInputs fields={customFields} draft={custom} onChange={setCustom} issue={issue} />
+          <CustomFieldInputs section="vehicles" fields={customFields} draft={custom} onChange={setCustom} onBusy={onBusy} issue={issue} />
         </div>
       )}
       <ErrorNote error={save.error} />

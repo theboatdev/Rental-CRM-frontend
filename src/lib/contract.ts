@@ -68,10 +68,12 @@ export type CustomField = CustomFieldBase &
     | { type: "date" }
     | { type: "boolean" }
     | { type: "select"; options: ListItem[] }
+    /** One uploaded file: `images` (stored as JPEGs at most 2000 px) or `documents` (images or PDF). */
+    | { type: "file"; accept: "images" | "documents" }
   );
 
-/** A record's custom field values by key: text, YYYY-MM-DD dates and select option keys as strings. */
-export type CustomFieldValues = Record<string, string | number | boolean>;
+/** A record's custom field values by key: text, YYYY-MM-DD dates and select option keys as strings, files as `FileView`s. */
+export type CustomFieldValues = Record<string, string | number | boolean | FileView>;
 
 export interface TenantConfig {
   schemaVersion: number;
@@ -119,6 +121,8 @@ export interface TenantConfig {
   };
   /** Every field of each kind of record: settings for the built-in ones, and the tenant's custom fields. */
   fields: Record<FieldSection, { builtIn: Record<string, BuiltInFieldSettings>; custom: CustomField[] }>;
+  /** The PDFs the app issues. The backend decides what's in them; the app only needs to know they're on. */
+  documents: { returnReceipt: { enabled: boolean } };
   limits: { maxVehicles: number; maxUsers: number; storageGb: number };
 }
 
@@ -220,7 +224,7 @@ export type FileKind = "document" | "inspection" | "bill" | "vehiclePhoto";
 
 /** POST /uploads: the fields of a signed upload, posted to Cloudinary together with the file. */
 export interface UploadSignature {
-  kind: FileKind | "logo";
+  kind: FileKind | "logo" | "customField";
   publicId: string;
   uploadUrl: string;
   fields: Record<string, string | number>;
@@ -307,6 +311,8 @@ export interface Rental {
   paidAmount: number;
   balance: number;
   depositRefunded: boolean;
+  /** Staff confirmed the renter paid the full amount (usually at pickup). Cleared if a void or refund leaves money owed. */
+  fullPayment: { at: string; by: Actor | null } | null;
   startMileage: number | null;
   endMileage: number | null;
   distance: number | null;

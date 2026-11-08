@@ -48,6 +48,7 @@ export function BookingDialog({ defaults, onClose, onBooked }: { defaults: Booki
   const [custom, setCustom] = useState(() => draftOf(rentalFields));
   const [advanceCustom, setAdvanceCustom] = useState(() => draftOf(paymentFields));
   const [handOver, setHandOver] = useState(false);
+  const [fullyPaid, setFullyPaid] = useState(false);
   const [checkedPoints, setCheckedPoints] = useState<string[]>([]);
   const [photos, setPhotos] = useState<InspectionPhotos>({});
   const { uploading, onBusy } = useUploadsInFlight();
@@ -64,9 +65,15 @@ export function BookingDialog({ defaults, onClose, onBooked }: { defaults: Booki
   const startsToday = form.startDate === today();
   const canHandOver = startsToday && can("rentals:checkin");
   const issue = (path: string) => book.error?.issueFor(path);
+  const fullAmount = Math.max(days, 0) * rate + deposit;
+  // Handing over with the full amount paid: with payments on, the advance collects all of it, so the ledger agrees.
+  const paysInFull = canHandOver && handOver && fullyPaid;
+  const collectsInFull = paysInFull && canAdvance;
+  const offerFullPayment = !moduleOn("payments") || canAdvance;
+  const advanceValue = collectsInFull ? String(fullAmount) : form.advance;
 
   const submit = () => {
-    const advance = numberOrUndefined(form.advance);
+    const advance = numberOrUndefined(advanceValue);
     book.mutate(
       {
         vehicleId: form.vehicleId,
@@ -85,7 +92,7 @@ export function BookingDialog({ defaults, onClose, onBooked }: { defaults: Booki
             }
           : {}),
         customFields: customFieldsPayload(rentalFields, custom),
-        ...(canHandOver && handOver ? { pickup: { checkedPoints, photos: photosPayload(photos) } } : {}),
+        ...(canHandOver && handOver ? { pickup: { checkedPoints, photos: photosPayload(photos), confirmFullPayment: paysInFull } } : {}),
       },
       {
         onSuccess: (rental) => {
@@ -207,8 +214,14 @@ export function BookingDialog({ defaults, onClose, onBooked }: { defaults: Booki
 
         {canAdvance && (
           <div className="grid gap-3 sm:grid-cols-2">
-            <Field label={`Advance collected (${config.locale.currency})`} error={issue("advance.amount")}>
-              {(id) => <Input id={id} type="number" min="0" step="any" value={form.advance} onChange={(e) => set({ advance: e.target.value })} />}
+            <Field
+              label={`${collectsInFull ? "Collected now" : "Advance collected"} (${config.locale.currency})`}
+              hint={collectsInFull ? "The full amount: the rental and the deposit." : undefined}
+              error={issue("advance.amount")}
+            >
+              {(id) => (
+                <Input id={id} type="number" min="0" step="any" disabled={collectsInFull} value={advanceValue} onChange={(e) => set({ advance: e.target.value })} />
+              )}
             </Field>
             <Field label={pf("method").label} hint={pf("method").help} error={issue("advance.method")}>
               {(id) => (
@@ -221,7 +234,7 @@ export function BookingDialog({ defaults, onClose, onBooked }: { defaults: Booki
                 </Select>
               )}
             </Field>
-            {numberOrUndefined(form.advance) ? (
+            {numberOrUndefined(advanceValue) ? (
               <>
                 {pf("transactionReference").on && (
                   <Field label={pf("transactionReference").label} hint={pf("transactionReference").help} error={issue("advance.transactionReference")}>
@@ -234,7 +247,7 @@ export function BookingDialog({ defaults, onClose, onBooked }: { defaults: Booki
                     {(id) => <Input id={id} required value={form.advanceNotes} onChange={(e) => set({ advanceNotes: e.target.value })} />}
                   </Field>
                 )}
-                <CustomFieldInputs fields={paymentFields} draft={advanceCustom} onChange={setAdvanceCustom} issue={issue} path="advance.customFields" />
+                <CustomFieldInputs section="payments" fields={paymentFields} draft={advanceCustom} onChange={setAdvanceCustom} onBusy={onBusy} issue={issue} path="advance.customFields" />
               </>
             ) : null}
           </div>
@@ -248,7 +261,7 @@ export function BookingDialog({ defaults, onClose, onBooked }: { defaults: Booki
 
         {rentalFields.length > 0 && (
           <div className="grid gap-3 sm:grid-cols-2">
-            <CustomFieldInputs fields={rentalFields} draft={custom} onChange={setCustom} issue={issue} />
+            <CustomFieldInputs section="rentals" fields={rentalFields} draft={custom} onChange={setCustom} onBusy={onBusy} issue={issue} />
           </div>
         )}
 
@@ -264,6 +277,25 @@ export function BookingDialog({ defaults, onClose, onBooked }: { defaults: Booki
                 onBusy={onBusy}
                 required={config.modules.rentals.requirePickupInspection}
               />
+            )}
+            {handOver && offerFullPayment && (
+              <div>
+                <Checkbox
+                  label={
+                    <>
+                      <span className="font-semibold">Full amount paid</span>
+                      {canAdvance ? `: collect ${format.money(fullAmount)} now (the rental and the deposit)` : ": the renter has paid everything for this rental"}
+                    </>
+                  }
+                  checked={fullyPaid}
+                  onChange={setFullyPaid}
+                />
+                {issue("pickup.confirmFullPayment") && (
+                  <p role="alert" className="mt-1 text-xs font-semibold text-rose-700">
+                    {issue("pickup.confirmFullPayment")}
+                  </p>
+                )}
+              </div>
             )}
           </div>
         )}
