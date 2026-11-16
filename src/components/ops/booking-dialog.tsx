@@ -47,6 +47,7 @@ export function BookingDialog({ defaults, onClose, onBooked }: { defaults: Booki
     endDate: addDays(start, Math.max(3, config.rules.minRentalDays)),
     dailyRate: "",
     depositAmount: "",
+    supplierRentalCost: "",
     advance: "",
     method: options("paymentMethods")[0]?.key ?? "",
     advanceReference: "",
@@ -77,11 +78,16 @@ export function BookingDialog({ defaults, onClose, onBooked }: { defaults: Booki
   // With the rate or deposit field off, bookings take the vehicle's (or class sample).
   const rate = (f("dailyRate").on ? numberOrUndefined(form.dailyRate) : undefined) ?? chosen?.dailyRate ?? 0;
   const deposit = (f("depositAmount").on ? numberOrUndefined(form.depositAmount) : undefined) ?? chosen?.depositAmount ?? 0;
+  const isThirdParty = chosenVehicle?.ownership === "THIRD_PARTY";
+  const showSupplierCost = Boolean(config.modules.vehicles.thirdPartyVehicles) && showVehiclePicker && Boolean(isThirdParty);
+  const supplierCost = showSupplierCost ? (numberOrUndefined(form.supplierRentalCost) ?? 0) : 0;
+  const customerRevenue = Math.max(days, 0) * rate;
+  const grossProfit = customerRevenue - supplierCost;
   const canAdvance = moduleOn("payments") && can("payments:record");
   const startsToday = form.startDate === today();
   const canHandOver = startsToday && can("rentals:checkin") && showVehiclePicker;
   const issue = (path: string) => book.error?.issueFor(path);
-  const fullAmount = Math.max(days, 0) * rate + deposit;
+  const fullAmount = customerRevenue + deposit;
   // Handing over with the full amount paid: with payments on, the advance collects all of it, so the ledger agrees.
   const paysInFull = canHandOver && handOver && fullyPaid;
   const collectsInFull = paysInFull && canAdvance;
@@ -92,7 +98,7 @@ export function BookingDialog({ defaults, onClose, onBooked }: { defaults: Booki
   const switchStyle = (next: PickStyle) => {
     setPickStyle(next);
     setHandOver(false);
-    set({ vehicleId: "", requestedMake: "", requestedModel: "", dailyRate: "", depositAmount: "" });
+    set({ vehicleId: "", requestedMake: "", requestedModel: "", dailyRate: "", depositAmount: "", supplierRentalCost: "" });
   };
 
   const submit = () => {
@@ -106,6 +112,7 @@ export function BookingDialog({ defaults, onClose, onBooked }: { defaults: Booki
         startDate: form.startDate,
         endDate: form.endDate,
         ...withoutOff(f, { dailyRate: numberOrUndefined(form.dailyRate), depositAmount: numberOrUndefined(form.depositAmount), notes: form.notes }),
+        ...(showSupplierCost ? { supplierRentalCost: numberOrUndefined(form.supplierRentalCost) ?? 0 } : {}),
         ...(canAdvance && advance
           ? {
               advance: {
@@ -198,7 +205,7 @@ export function BookingDialog({ defaults, onClose, onBooked }: { defaults: Booki
                     required={showVehiclePicker}
                     disabled={!a.available}
                     checked={form.vehicleId === a.vehicle.id}
-                    onChange={() => set({ vehicleId: a.vehicle.id, dailyRate: "", depositAmount: "" })}
+                    onChange={() => set({ vehicleId: a.vehicle.id, dailyRate: "", depositAmount: "", supplierRentalCost: "" })}
                   />
                   <span>
                     <strong className="text-ink">
@@ -206,6 +213,7 @@ export function BookingDialog({ defaults, onClose, onBooked }: { defaults: Booki
                     </strong>
                     <br />
                     {a.vehicle.plateNumber} · {format.money(a.dailyRate)}
+                    {config.modules.vehicles.thirdPartyVehicles && a.ownership === "THIRD_PARTY" ? " · Third-party" : ""}
                     <br />
                     <span className={a.available ? "text-emerald-700" : "text-rose-700"}>{a.reason ?? "Available for these dates"}</span>
                   </span>
@@ -259,7 +267,7 @@ export function BookingDialog({ defaults, onClose, onBooked }: { defaults: Booki
           </fieldset>
         )}
 
-        {(f("dailyRate").on || f("depositAmount").on) && (
+        {(f("dailyRate").on || f("depositAmount").on || showSupplierCost) && (
           <div className="grid gap-3 sm:grid-cols-2">
             {f("dailyRate").on && (
               <Field label={`${f("dailyRate").label} (${config.locale.currency})`} hint={f("dailyRate").help ?? "Defaults to the vehicle's rate"} error={issue("dailyRate")}>
@@ -289,6 +297,25 @@ export function BookingDialog({ defaults, onClose, onBooked }: { defaults: Booki
                     placeholder={chosen ? String(chosen.depositAmount) : ""}
                     value={form.depositAmount}
                     onChange={(e) => set({ depositAmount: e.target.value })}
+                  />
+                )}
+              </Field>
+            )}
+            {showSupplierCost && (
+              <Field
+                label={`Supplier rental cost (${config.locale.currency})`}
+                hint="Amount payable to the third-party vehicle supplier for this booking."
+                error={issue("supplierRentalCost")}
+              >
+                {(id) => (
+                  <Input
+                    id={id}
+                    type="number"
+                    required
+                    min="0"
+                    step="any"
+                    value={form.supplierRentalCost}
+                    onChange={(e) => set({ supplierRentalCost: e.target.value })}
                   />
                 )}
               </Field>
@@ -386,9 +413,17 @@ export function BookingDialog({ defaults, onClose, onBooked }: { defaults: Booki
 
         <div className="space-y-1 border border-line bg-paper p-3 text-sm">
           <p>
-            {Math.max(days, 0)} days × {format.money(rate)} = <strong>{format.money(Math.max(days, 0) * rate)}</strong>
+            {Math.max(days, 0)} days × {format.money(rate)} = <strong>{format.money(customerRevenue)}</strong>
           </p>
           <p className="text-muted">Refundable security deposit: {format.money(deposit)}</p>
+          {showSupplierCost && (
+            <>
+              <p className="text-muted">Third-party supplier rental cost: {format.money(supplierCost)}</p>
+              <p>
+                Gross profit before other expenses: <strong>{format.money(grossProfit)}</strong>
+              </p>
+            </>
+          )}
         </div>
 
         <ErrorNote error={book.error} />

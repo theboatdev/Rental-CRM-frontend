@@ -103,7 +103,7 @@ export interface TenantConfig {
   };
   modules: {
     dashboard: Toggle;
-    vehicles: Toggle & { serviceIntervalKm: number };
+    vehicles: Toggle & { serviceIntervalKm: number; thirdPartyVehicles: boolean };
     renters: Toggle;
     rentals: Toggle & {
       inspectionPoints: string[];
@@ -163,6 +163,8 @@ export interface Actor {
 export type VehicleStatus = "AVAILABLE" | "RENTED" | "MAINTENANCE";
 export type Transmission = "AUTOMATIC" | "MANUAL";
 export type FuelType = "PETROL" | "DIESEL" | "HYBRID" | "ELECTRIC";
+/** Owned fleet vs supplier-sourced. Meaningful when modules.vehicles.thirdPartyVehicles is on. */
+export type VehicleOwnership = "OWNED" | "THIRD_PARTY";
 
 export interface VehicleRef {
   id: string;
@@ -179,6 +181,10 @@ export interface VehicleStats {
   fuelCosts?: number;
   fuelLiters?: number;
   revenue?: number;
+  /** Present when third-party vehicle tracking is on. */
+  supplierCosts?: number;
+  /** revenue − supplierCosts; present when third-party vehicle tracking is on. */
+  grossProfit?: number;
   operatingCosts?: number;
   profit?: number;
 }
@@ -204,6 +210,7 @@ export interface Vehicle extends VehicleRef {
   depositAmount: number;
   mileage: number;
   status: VehicleStatus;
+  ownership: VehicleOwnership;
   thumbnail: string | null;
   notes: string;
   customFields: CustomFieldValues;
@@ -226,6 +233,7 @@ export interface VehicleDossier extends VehicleWithStats {
 
 export interface Availability {
   vehicle: VehicleRef;
+  ownership: VehicleOwnership;
   dailyRate: number;
   depositAmount: number;
   available: boolean;
@@ -358,6 +366,8 @@ export interface Rental {
   dailyRate: number;
   totalAmount: number;
   depositAmount: number;
+  /** Amount payable to a third-party supplier; present when recorded on the booking. */
+  supplierRentalCost?: number;
   paidAmount: number;
   balance: number;
   depositRefunded: boolean;
@@ -464,6 +474,10 @@ export interface Dashboard {
     fuelCosts?: number;
     fuelLiters?: number;
     revenue?: number;
+    /** Present when third-party vehicle tracking is on. */
+    supplierCosts?: number;
+    /** revenue − supplierCosts; present when third-party vehicle tracking is on. */
+    grossProfit?: number;
     operatingCosts?: number;
     profit?: number;
     profitMargin?: number | null;

@@ -23,3 +23,4 @@ export const PAYMENT_TYPE_LABELS: Record<PaymentType, string> = {
 
 export const TRANSMISSION_LABELS = { AUTOMATIC: "Automatic", MANUAL: "Manual" } as const;
 export const FUEL_LABELS = { PETROL: "Petrol", DIESEL: "Diesel", HYBRID: "Hybrid", ELECTRIC: "Electric" } as const;
+export const OWNERSHIP_LABELS = { OWNED: "Owned", THIRD_PARTY: "Third-party supplier" } as const;

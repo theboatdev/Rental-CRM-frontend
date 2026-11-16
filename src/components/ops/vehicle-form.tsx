@@ -5,11 +5,11 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { CustomFieldInputs, customFieldsPayload, draftOf, useFields, withoutOff } from "@/components/ops/fields";
 import { FilePicker, useUploadsInFlight } from "@/components/ops/files";
-import { FUEL_LABELS, TRANSMISSION_LABELS } from "@/components/ops/status";
+import { FUEL_LABELS, OWNERSHIP_LABELS, TRANSMISSION_LABELS } from "@/components/ops/status";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Select, Textarea, numberOrUndefined } from "@/components/ui/field";
 import { ErrorNote } from "@/components/ui/page";
-import type { FuelType, Transmission, UploadedFile, Vehicle } from "@/lib/contract";
+import type { FuelType, Transmission, UploadedFile, Vehicle, VehicleOwnership } from "@/lib/contract";
 import { useTenantMutation } from "@/lib/queries";
 import { DOCUMENT_ACCEPT, PHOTO_ACCEPT, useFileUpload } from "@/lib/uploads";
 import { useWorkspace } from "@/lib/workspace";
@@ -94,6 +94,7 @@ export function VehicleForm({ vehicle, onDone }: { vehicle?: Vehicle; onDone: (s
   const { config } = useWorkspace();
   const { currency, secondaryCurrency, distanceUnit } = config.locale;
   const { builtIn: f, custom: customFields } = useFields("vehicles");
+  const thirdPartyVehicles = Boolean(config.modules.vehicles.thirdPartyVehicles);
   const [form, setForm] = useState({
     plateNumber: vehicle?.plateNumber ?? "",
     make: vehicle?.make ?? "",
@@ -105,6 +106,7 @@ export function VehicleForm({ vehicle, onDone }: { vehicle?: Vehicle; onDone: (s
     secondaryDailyRate: vehicle?.secondaryDailyRate ? String(vehicle.secondaryDailyRate) : "",
     depositAmount: vehicle ? String(vehicle.depositAmount) : "",
     mileage: vehicle ? String(vehicle.mileage) : "",
+    ownership: (vehicle?.ownership ?? "OWNED") as VehicleOwnership,
     notes: vehicle?.notes ?? "",
   });
   const [savedPhoto, setSavedPhoto] = useState(vehicle?.thumbnail ?? null);
@@ -161,6 +163,7 @@ export function VehicleForm({ vehicle, onDone }: { vehicle?: Vehicle; onDone: (s
               notes: form.notes,
             }),
             ...(showSecondary ? { secondaryDailyRate: numberOrUndefined(form.secondaryDailyRate) ?? null } : {}),
+            ...(thirdPartyVehicles ? { ownership: form.ownership } : {}),
             customFields: customFieldsPayload(customFields, custom, vehicle ? initialCustom : undefined),
             ...(documents !== undefined ? { documents } : {}),
           },
@@ -249,6 +252,23 @@ export function VehicleForm({ vehicle, onDone }: { vehicle?: Vehicle; onDone: (s
           </Field>
         )}
       </div>
+      {thirdPartyVehicles && (
+        <Field
+          label={f("ownership").on ? f("ownership").label : "Ownership"}
+          hint={f("ownership").help}
+          error={issue("ownership")}
+        >
+          {(id) => (
+            <Select id={id} value={form.ownership} onChange={(e) => set({ ownership: e.target.value as VehicleOwnership })}>
+              {Object.entries(OWNERSHIP_LABELS).map(([key, label]) => (
+                <option key={key} value={key}>
+                  {label}
+                </option>
+              ))}
+            </Select>
+          )}
+        </Field>
+      )}
       {f("thumbnail").on && (
         <PhotoInput
           label={f("thumbnail").label}

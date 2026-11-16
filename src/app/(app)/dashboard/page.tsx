@@ -91,6 +91,14 @@ function DashboardBody({ data }: { data: Dashboard }) {
         {financial ? (
           <>
             <Stat label="Contract revenue" value={format.money(totals.revenue ?? 0)} note={`${totals.trips} rentals started`} tone="green" />
+            {totals.grossProfit !== undefined && (
+              <Stat
+                label="Gross profit"
+                value={format.money(totals.grossProfit)}
+                note={`${format.money(totals.supplierCosts ?? 0)} supplier costs`}
+                tone={(totals.grossProfit ?? 0) >= 0 ? "green" : "rose"}
+              />
+            )}
             <Stat
               label="Net profit"
               value={format.money(totals.profit ?? 0)}
@@ -112,8 +120,14 @@ function DashboardBody({ data }: { data: Dashboard }) {
             <CashflowBars
               bars={[
                 { label: "Revenue", value: totals.revenue ?? 0, color: "#587565" },
+                ...(totals.supplierCosts !== undefined
+                  ? [{ label: "Supplier hire", value: totals.supplierCosts, color: "#7a6a58" }]
+                  : []),
                 { label: "Workshop", value: totals.serviceCosts ?? 0, color: "#b28b52" },
                 { label: "Fuel", value: totals.fuelCosts ?? 0, color: "#ad6965" },
+                ...(totals.grossProfit !== undefined
+                  ? [{ label: "Gross profit", value: totals.grossProfit, color: "#587565" }]
+                  : []),
                 { label: "Net profit", value: totals.profit ?? 0, color: "var(--brand)" },
               ]}
             />

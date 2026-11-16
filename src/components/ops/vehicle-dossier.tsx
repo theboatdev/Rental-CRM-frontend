@@ -7,7 +7,7 @@ import { CostForm, FuelForm } from "@/components/ops/cost-forms";
 import { CustomFieldList, useFields, useHasCustomValues } from "@/components/ops/fields";
 import { FilePicker, FileLink, useUploadsInFlight } from "@/components/ops/files";
 import { DOCUMENT_ACCEPT } from "@/lib/uploads";
-import { FUEL_LABELS, RentalStatusBadge, TRANSMISSION_LABELS, VehicleStatusBadge } from "@/components/ops/status";
+import { FUEL_LABELS, OWNERSHIP_LABELS, RentalStatusBadge, TRANSMISSION_LABELS, VehicleStatusBadge } from "@/components/ops/status";
 import { VehicleForm } from "@/components/ops/vehicle-form";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
@@ -53,9 +53,11 @@ function Dossier({ vehicle, onClose }: { vehicle: VehicleDossier; onClose: () =>
   const { builtIn: f } = useFields("vehicles");
   const hasCustomValues = useHasCustomValues("vehicles", vehicle.customFields);
   const secondary = f("secondaryDailyRate").on && vehicle.secondaryDailyRate !== null ? format.secondaryMoney(vehicle.secondaryDailyRate) : null;
+  const thirdPartyVehicles = Boolean(config.modules.vehicles.thirdPartyVehicles);
   const details: Array<[string, string]> = [
     ...(f("transmission").on ? [[f("transmission").label, TRANSMISSION_LABELS[vehicle.transmission]] as [string, string]] : []),
     ...(f("fuelType").on ? [[f("fuelType").label, FUEL_LABELS[vehicle.fuelType]] as [string, string]] : []),
+    ...(thirdPartyVehicles ? [["Ownership", OWNERSHIP_LABELS[vehicle.ownership ?? "OWNED"]] as [string, string]] : []),
     ...(secondary ? [[f("secondaryDailyRate").label, `${secondary}/day`] as [string, string]] : []),
     ...(f("notes").on && vehicle.notes ? [[f("notes").label, vehicle.notes] as [string, string]] : []),
   ];
@@ -88,6 +90,14 @@ function Dossier({ vehicle, onClose }: { vehicle: VehicleDossier; onClose: () =>
         <Metric label="Odometer" value={format.distance(vehicle.mileage)} note={`${format.distance(stats.distance)} by renters`} />
         {stats.serviceCosts !== undefined && <Metric label="Service costs" value={format.money(stats.serviceCosts)} tone="rose" />}
         {stats.fuelCosts !== undefined && <Metric label="Fuel" value={`${format.number(stats.fuelLiters ?? 0)} L`} note={format.money(stats.fuelCosts)} tone="amber" />}
+        {stats.grossProfit !== undefined && (
+          <Metric
+            label="Gross profit"
+            value={format.money(stats.grossProfit)}
+            note={stats.supplierCosts !== undefined ? `${format.money(stats.supplierCosts)} supplier` : undefined}
+            tone={stats.grossProfit >= 0 ? "green" : "rose"}
+          />
+        )}
         {stats.profit !== undefined && <Metric label="Net profit" value={format.money(stats.profit)} note={stats.revenue !== undefined ? `on ${format.money(stats.revenue)}` : undefined} tone={stats.profit >= 0 ? "green" : "rose"} />}
       </div>
 

@@ -79,6 +79,12 @@ function RentalDetails({ rental, onClose }: { rental: RentalDetail; onClose: () 
         {/* The rate and deposit are part of what's owed, so they show even when their booking fields are off. */}
         <Item label={f("dailyRate").label}>{format.money(rental.dailyRate)} / day</Item>
         <Item label="Rental total">{format.money(rental.totalAmount)}</Item>
+        {rental.supplierRentalCost != null && (
+          <>
+            <Item label="Supplier rental cost">{format.money(rental.supplierRentalCost)}</Item>
+            <Item label="Gross profit before other expenses">{format.money(rental.totalAmount - rental.supplierRentalCost)}</Item>
+          </>
+        )}
         <Item label={f("depositAmount").label}>{format.money(rental.depositAmount)}</Item>
         <Item label="Paid">{format.money(rental.paidAmount)}</Item>
         <Item label="Outstanding">
@@ -215,8 +221,11 @@ function RentalDetails({ rental, onClose }: { rental: RentalDetail; onClose: () 
 
 /** Assigns (or reassigns) a registration plate to a RESERVED booking. */
 function AssignVehicleForm({ rental, onDone }: { rental: RentalDetail; onDone: () => void }) {
-  const { format } = useWorkspace();
+  const { format, config } = useWorkspace();
   const [vehicleId, setVehicleId] = useState(rental.vehicle?.id ?? "");
+  const [supplierRentalCost, setSupplierRentalCost] = useState(
+    rental.supplierRentalCost != null ? String(rental.supplierRentalCost) : "",
+  );
   const availability = useAvailability(rental.startDate, rental.endDate, rental.id);
   const assign = useTenantMutation((request, body: unknown) =>
     request<RentalDetail>("POST", `/rentals/${rental.id}/assign-vehicle`, body),
@@ -228,6 +237,8 @@ function AssignVehicleForm({ rental, onDone }: { rental: RentalDetail; onDone: (
     (make.toLowerCase() === rental.requestedMake.toLowerCase() && model.toLowerCase() === rental.requestedModel.toLowerCase());
 
   const options = (availability.data?.vehicles ?? []).filter((a) => matchesClass(a.vehicle.make, a.vehicle.model));
+  const chosen = options.find((a) => a.vehicle.id === vehicleId);
+  const showSupplierCost = Boolean(config.modules.vehicles.thirdPartyVehicles) && chosen?.ownership === "THIRD_PARTY";
 
   return (
     <div className="space-y-3 border border-brand/30 bg-brand/5 p-4">
@@ -253,7 +264,10 @@ function AssignVehicleForm({ rental, onDone }: { rental: RentalDetail; onDone: (
               className="mt-0.5 accent-[var(--brand)]"
               disabled={!a.available && a.vehicle.id !== rental.vehicle?.id}
               checked={vehicleId === a.vehicle.id}
-              onChange={() => setVehicleId(a.vehicle.id)}
+              onChange={() => {
+                setVehicleId(a.vehicle.id);
+                setSupplierRentalCost("");
+              }}
             />
             <span className="text-sm">
               <strong className="text-ink">
@@ -261,6 +275,7 @@ function AssignVehicleForm({ rental, onDone }: { rental: RentalDetail; onDone: (
               </strong>
               <br />
               {a.vehicle.plateNumber} · {format.money(a.dailyRate)}
+              {config.modules.vehicles.thirdPartyVehicles && a.ownership === "THIRD_PARTY" ? " · Third-party" : ""}
               <br />
               <span className={a.available || a.vehicle.id === rental.vehicle?.id ? "text-emerald-700" : "text-rose-700"}>
                 {a.vehicle.id === rental.vehicle?.id ? "Currently assigned" : (a.reason ?? "Available")}
@@ -269,6 +284,25 @@ function AssignVehicleForm({ rental, onDone }: { rental: RentalDetail; onDone: (
           </label>
         ))}
       </div>
+      {showSupplierCost && (
+        <Field
+          label={`Supplier rental cost (${config.locale.currency})`}
+          hint="Amount payable to the third-party vehicle supplier for this booking."
+          error={assign.error?.issueFor("supplierRentalCost")}
+        >
+          {(id) => (
+            <Input
+              id={id}
+              type="number"
+              required
+              min="0"
+              step="any"
+              value={supplierRentalCost}
+              onChange={(e) => setSupplierRentalCost(e.target.value)}
+            />
+          )}
+        </Field>
+      )}
       {options.length === 0 && !availability.isFetching && <p className="text-sm text-muted">No matching vehicles for these dates.</p>}
       <ErrorNote error={assign.error} />
       <div className="flex justify-end gap-2">
@@ -277,10 +311,13 @@ function AssignVehicleForm({ rental, onDone }: { rental: RentalDetail; onDone: (
         </Button>
         <Button
           variant="primary"
-          disabled={!vehicleId || assign.isPending || vehicleId === rental.vehicle?.id}
+          disabled={!vehicleId || assign.isPending || (vehicleId === rental.vehicle?.id && !showSupplierCost)}
           onClick={() =>
             assign.mutate(
-              { vehicleId },
+              {
+                vehicleId,
+                ...(showSupplierCost ? { supplierRentalCost: numberOrUndefined(supplierRentalCost) ?? 0 } : {}),
+              },
               {
                 onSuccess: (updated) => {
                   toast.success(`${updated.vehicle?.plateNumber ?? "Vehicle"} assigned to ${updated.code}`);

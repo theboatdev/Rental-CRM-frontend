@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { FileLink, FilePicker, PhotoThumb, useUploadsInFlight } from "@/components/ops/files";
-import { FUEL_LABELS, TRANSMISSION_LABELS } from "@/components/ops/status";
+import { FUEL_LABELS, OWNERSHIP_LABELS, TRANSMISSION_LABELS } from "@/components/ops/status";
 import { Button } from "@/components/ui/button";
 import { Checkbox, Field, Input, Select, Textarea } from "@/components/ui/field";
 import { ErrorNote } from "@/components/ui/page";
@@ -271,6 +271,8 @@ function formatBuiltIn(key: string, value: unknown, format: Formatters): string 
       return TRANSMISSION_LABELS[value as keyof typeof TRANSMISSION_LABELS] ?? String(value);
     case "fuelType":
       return FUEL_LABELS[value as keyof typeof FUEL_LABELS] ?? String(value);
+    case "ownership":
+      return OWNERSHIP_LABELS[value as keyof typeof OWNERSHIP_LABELS] ?? String(value);
     case "residentType":
       return value === "tourist" ? "Tourist" : "Resident";
     default:
