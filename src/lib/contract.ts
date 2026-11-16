@@ -32,6 +32,12 @@ export interface DocumentTypeItem extends ListItem {
   requiredFor: ResidentType[];
 }
 
+/** One vehicle compliance document type configured for this tenant (e.g. insurance, revenue licence). */
+export interface VehicleDocumentTypeItem extends ListItem {
+  /** Days before expiry to show a document_expiry alert on the dashboard. */
+  alertDaysBefore: number;
+}
+
 interface Toggle {
   enabled: boolean;
 }
@@ -112,6 +118,8 @@ export interface TenantConfig {
     documentTypes: DocumentTypeItem[];
     paymentMethods: ListItem[];
     costCategories: ListItem[];
+    /** Vehicle compliance document types (insurance, revenue licence, etc.). Absent on older published configs until republished. */
+    vehicleDocumentTypes?: VehicleDocumentTypeItem[];
   };
   rules: {
     defaultDepositAmount: number;
@@ -169,6 +177,17 @@ export interface VehicleStats {
   profit?: number;
 }
 
+/** A compliance document attached to a vehicle (insurance, revenue licence, etc.). */
+export interface VehicleDocument {
+  id: string;
+  /** Key from lists.vehicleDocumentTypes. */
+  type: string;
+  /** YYYY-MM-DD expiry date, or null if not set. */
+  expiresAt: string | null;
+  file: FileView | null;
+  uploadedAt: string | null;
+}
+
 export interface Vehicle extends VehicleRef {
   /** Null when the config turns the year off. */
   year: number | null;
@@ -182,6 +201,8 @@ export interface Vehicle extends VehicleRef {
   thumbnail: string | null;
   notes: string;
   customFields: CustomFieldValues;
+  /** Compliance documents (insurance, revenue licence, etc.). Empty/absent when none have been added. */
+  documents?: VehicleDocument[];
   createdAt: string;
   updatedAt: string;
 }
@@ -220,7 +241,7 @@ export interface FileView {
   uploadedAt: string | null;
 }
 
-export type FileKind = "document" | "inspection" | "bill" | "vehiclePhoto";
+export type FileKind = "document" | "inspection" | "bill" | "vehiclePhoto" | "vehicleDocument";
 
 /** POST /uploads: the fields of a signed upload, posted to Cloudinary together with the file. */
 export interface UploadSignature {
@@ -394,7 +415,7 @@ export interface FuelLog {
 export type DashboardRange = "7d" | "30d" | "90d" | "all";
 
 export interface DashboardAlert {
-  kind: "overdue" | "compliance" | "maintenance" | "service_due";
+  kind: "overdue" | "compliance" | "maintenance" | "service_due" | "document_expiry";
   title: string;
   detail: string;
   rentalId?: string;

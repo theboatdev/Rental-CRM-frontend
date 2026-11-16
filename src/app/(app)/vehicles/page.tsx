@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowUpRight, Car, Fuel, Plus, Users, Wrench } from "lucide-react";
+import { AlertTriangle, ArrowUpRight, Car, Fuel, Plus, Users, Wrench } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState, type ReactNode } from "react";
 import { useListColumns } from "@/components/ops/fields";
@@ -13,6 +13,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { EmptyState, ErrorNote, Loading, PageHeader } from "@/components/ui/page";
 import type { VehicleWithStats } from "@/lib/contract";
 import { useVehicles } from "@/lib/queries";
+import { vehicleDocumentAlert } from "@/lib/vehicle-documents";
 import { useWorkspace } from "@/lib/workspace";
 
 export default function VehiclesPage() {
@@ -74,10 +75,11 @@ function Vehicles() {
 const NATIVE_FIELDS = ["plateNumber", "make", "model", "year", "transmission", "fuelType", "dailyRate", "secondaryDailyRate", "depositAmount", "mileage", "thumbnail"];
 
 function VehicleCard({ vehicle, onOpen }: { vehicle: VehicleWithStats; onOpen: () => void }) {
-  const { format } = useWorkspace();
+  const { format, config, today } = useWorkspace();
   // The card shows these built-in fields in its own way; the config decides whether each one shows.
   const { listed, columns } = useListColumns<VehicleWithStats>("vehicles", NATIVE_FIELDS);
   const { stats } = vehicle;
+  const docAlert = vehicleDocumentAlert(vehicle.documents, config, today());
   const secondary = listed("secondaryDailyRate") && vehicle.secondaryDailyRate !== null ? format.secondaryMoney(vehicle.secondaryDailyRate) : null;
   const specs = [listed("transmission") && TRANSMISSION_LABELS[vehicle.transmission], listed("fuelType") && FUEL_LABELS[vehicle.fuelType]].filter(Boolean);
   const figures = [
@@ -99,9 +101,20 @@ function VehicleCard({ vehicle, onOpen }: { vehicle: VehicleWithStats; onOpen: (
             </div>
           )}
           <span className="absolute top-3 left-3 rounded bg-panel/95 px-2 py-1 font-mono text-xs font-semibold tracking-normal text-ink">{vehicle.plateNumber}</span>
-          <span className="absolute top-3 right-3">
+          <div className="absolute top-3 right-3 flex items-center gap-1.5">
+            {docAlert && (
+              <span
+                title={docAlert.title}
+                className={`inline-flex size-7 items-center justify-center rounded-full shadow-sm ${
+                  docAlert.tone === "expired" ? "bg-rose-600 text-white" : "bg-amber-500 text-white"
+                }`}
+              >
+                <AlertTriangle size={14} strokeWidth={2.5} aria-hidden />
+                <span className="sr-only">{docAlert.title}</span>
+              </span>
+            )}
             <VehicleStatusBadge status={vehicle.status} />
-          </span>
+          </div>
           {specs.length > 0 && <span className="absolute right-3 bottom-2 bg-black/75 px-1.5 py-0.5 font-sans text-xs text-white/90">{specs.join(" · ")}</span>}
         </div>
         <div className="space-y-3 p-5">

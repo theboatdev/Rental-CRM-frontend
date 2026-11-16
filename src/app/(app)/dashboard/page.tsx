@@ -212,6 +212,7 @@ const ALERT_ICONS: Record<DashboardAlert["kind"], ReactNode> = {
   compliance: <ShieldAlert size={14} className="text-violet-700" />,
   maintenance: <Wrench size={14} className="text-amber-700" />,
   service_due: <AlertTriangle size={14} className="text-amber-700" />,
+  document_expiry: <AlertTriangle size={14} className="text-rose-600" />,
 };
 
 /** Where an alert leads: its rental, renter or vehicle. */

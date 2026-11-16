@@ -11,7 +11,7 @@ import { Field, Input, Select, Textarea, numberOrUndefined } from "@/components/
 import { ErrorNote } from "@/components/ui/page";
 import type { FuelType, Transmission, UploadedFile, Vehicle } from "@/lib/contract";
 import { useTenantMutation } from "@/lib/queries";
-import { PHOTO_ACCEPT, useFileUpload } from "@/lib/uploads";
+import { DOCUMENT_ACCEPT, PHOTO_ACCEPT, useFileUpload } from "@/lib/uploads";
 import { useWorkspace } from "@/lib/workspace";
 
 /**
@@ -87,6 +87,9 @@ function PhotoInput({
  * changes live in the dossier. Labels, help text and which fields show come
  * from the config's `fields.vehicles`.
  */
+/** Draft state for one vehicle compliance document on the create form. */
+type DocDraft = { type: string; file: UploadedFile | null; expiresAt: string };
+
 export function VehicleForm({ vehicle, onDone }: { vehicle?: Vehicle; onDone: (saved: Vehicle) => void }) {
   const { config } = useWorkspace();
   const { currency, secondaryCurrency, distanceUnit } = config.locale;
@@ -109,6 +112,17 @@ export function VehicleForm({ vehicle, onDone }: { vehicle?: Vehicle; onDone: (s
   const { uploading, onBusy } = useUploadsInFlight();
   const [initialCustom, setInitialCustom] = useState(() => draftOf(customFields, vehicle?.customFields));
   const [custom, setCustom] = useState(initialCustom);
+
+  // Document drafts are only used on create (the dossier Documents tab handles edits).
+  // Older published configs may omit vehicleDocumentTypes until republished.
+  const activeDocTypes = !vehicle ? (config.lists.vehicleDocumentTypes ?? []).filter((t) => t.active) : [];
+  const [docDrafts, setDocDrafts] = useState<DocDraft[]>(() =>
+    activeDocTypes.map((t) => ({ type: t.key, file: null, expiresAt: "" })),
+  );
+  const updateDoc = (index: number, patch: Partial<DocDraft>) =>
+    setDocDrafts((current) => current.map((d, i) => (i === index ? { ...d, ...patch } : d)));
+  const uploadVehicleDoc = useFileUpload("vehicleDocument");
+
   const save = useTenantMutation((request, body: unknown) =>
     vehicle ? request<Vehicle>("PATCH", `/vehicles/${vehicle.id}`, body) : request<Vehicle>("POST", "/vehicles", body),
   );
@@ -121,6 +135,16 @@ export function VehicleForm({ vehicle, onDone }: { vehicle?: Vehicle; onDone: (s
       className="space-y-3"
       onSubmit={(event) => {
         event.preventDefault();
+        // Build the documents array only for create (not update).
+        const documents = !vehicle
+          ? docDrafts
+              .filter((d) => d.file || d.expiresAt)
+              .map((d) => ({
+                type: d.type,
+                ...(d.expiresAt ? { expiresAt: d.expiresAt } : {}),
+                ...(d.file ? { file: d.file } : {}),
+              }))
+          : undefined;
         save.mutate(
           {
             ...withoutOff(f, {
@@ -138,6 +162,7 @@ export function VehicleForm({ vehicle, onDone }: { vehicle?: Vehicle; onDone: (s
             }),
             ...(showSecondary ? { secondaryDailyRate: numberOrUndefined(form.secondaryDailyRate) ?? null } : {}),
             customFields: customFieldsPayload(customFields, custom, vehicle ? initialCustom : undefined),
+            ...(documents !== undefined ? { documents } : {}),
           },
           {
             onSuccess: (saved) => {
@@ -244,6 +269,41 @@ export function VehicleForm({ vehicle, onDone }: { vehicle?: Vehicle; onDone: (s
       {customFields.length > 0 && (
         <div className="grid grid-cols-2 gap-3">
           <CustomFieldInputs section="vehicles" fields={customFields} draft={custom} onChange={setCustom} onBusy={onBusy} issue={issue} />
+        </div>
+      )}
+      {/* Document upload section — only shown when creating a new vehicle */}
+      {!vehicle && activeDocTypes.length > 0 && (
+        <div className="space-y-3 border-t border-line pt-4">
+          <p className="text-xs font-semibold tracking-normal text-ink">Compliance Documents</p>
+          {docDrafts.map((draft, index) => {
+            const docType = activeDocTypes[index];
+            if (!docType) return null;
+            return (
+              <div key={draft.type} className="rounded-md border border-line p-3 space-y-2">
+                <p className="text-xs font-semibold text-ink">{docType.label}</p>
+                <FilePicker
+                  label="Upload document"
+                  upload={uploadVehicleDoc}
+                  value={draft.file}
+                  onChange={(file) => updateDoc(index, { file })}
+                  onBusy={onBusy}
+                  accept={DOCUMENT_ACCEPT}
+                  hint="PDF, JPG or PNG"
+                  compact
+                />
+                <Field label="Expiry date" error={issue(`documents[${index}].expiresAt`)}>
+                  {(id) => (
+                    <Input
+                      id={id}
+                      type="date"
+                      value={draft.expiresAt}
+                      onChange={(e) => updateDoc(index, { expiresAt: e.target.value })}
+                    />
+                  )}
+                </Field>
+              </div>
+            );
+          })}
         </div>
       )}
       <ErrorNote error={save.error} />

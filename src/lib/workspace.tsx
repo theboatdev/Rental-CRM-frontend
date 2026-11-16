@@ -41,8 +41,8 @@ export function WorkspaceProvider({ me, config, children }: { me: Me; config: Co
       can: (permission) => permissions.has(permission),
       moduleOn: (module) => tenantConfig.modules[module].enabled,
       format: createFormatters(tenantConfig),
-      label: (list, key) => tenantConfig.lists[list].find((item) => item.key === key)?.label ?? key,
-      options: (list) => tenantConfig.lists[list].filter((item) => item.active).map(({ key, label }) => ({ key, label })),
+      label: (list, key) => (tenantConfig.lists[list] ?? []).find((item) => item.key === key)?.label ?? key,
+      options: (list) => (tenantConfig.lists[list] ?? []).filter((item) => item.active).map(({ key, label }) => ({ key, label })),
       today: () => todayIn(tenantConfig.locale.timezone),
     };
   }, [me, config]);
