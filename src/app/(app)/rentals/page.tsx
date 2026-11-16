@@ -104,7 +104,14 @@ function Rentals() {
                 {rentals.data.map((r) => (
                   <tr key={r.id} className={`${table.row} cursor-pointer`} onClick={() => openRental(r.id)}>
                     <td className={`${table.td} font-semibold text-ink`}>{r.code}</td>
-                    <td className={`${table.td} font-semibold text-brand`}>{r.vehicle.plateNumber}</td>
+                    <td className={`${table.td} font-semibold text-brand`}>
+                      {r.vehicle?.plateNumber ?? (
+                        <span className="text-amber-700">
+                          {r.requestedMake} {r.requestedModel}
+                          <span className="block text-xs font-medium">Unassigned</span>
+                        </span>
+                      )}
+                    </td>
                     <td className={table.td}>
                       <div className="font-semibold text-ink">{r.renter.fullName}</div>
                       <div className="text-xs text-muted">{r.renter.profileId}</div>

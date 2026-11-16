@@ -4,7 +4,7 @@ import { useAuth } from "@clerk/nextjs";
 import { useMutation, useQuery, useQueryClient, type UseQueryOptions } from "@tanstack/react-query";
 import { type ApiError, type ApiRequest, useApiRequest } from "./api";
 import type {
-  Availability,
+  AvailabilityResponse,
   AuditEntry,
   CalendarMonth,
   ConfigResponse,
@@ -60,7 +60,7 @@ export const useDashboard = (range: DashboardRange) => useTenantQuery<Dashboard>
 export const useVehicles = () => useTenantQuery<VehicleWithStats[]>(["vehicles"], "/vehicles");
 export const useVehicle = (id: string | null) => useTenantQuery<VehicleDossier>(["vehicles", id], id && `/vehicles/${id}`);
 export const useAvailability = (startDate: string, endDate: string, excludeRentalId?: string) =>
-  useTenantQuery<Availability[]>(
+  useTenantQuery<AvailabilityResponse>(
     ["availability", startDate, endDate, excludeRentalId],
     startDate && endDate && startDate < endDate ? `/vehicles/availability${query({ startDate, endDate, excludeRentalId })}` : null,
   );

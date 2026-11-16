@@ -93,7 +93,8 @@ function Calendar() {
                   <tr key={r.id} className={`${table.row} cursor-pointer`} onClick={() => setOpenId(r.id)}>
                     <td className={`${table.td} font-semibold`}>{r.code}</td>
                     <td className={table.td}>
-                      {r.vehicle.plateNumber}
+                      {r.vehicle?.plateNumber ?? (`${r.requestedMake ?? ""} ${r.requestedModel ?? ""}`.trim() || "Unassigned")}
+                      {!r.vehicle && <span className="block text-xs text-amber-700">Assign plate</span>}
                       <br />
                       {r.renter.fullName} · {r.renter.phone}
                     </td>
@@ -127,7 +128,7 @@ function Grid({ data, canBook, onBook, onOpen }: { data: CalendarMonth; canBook:
   const weekday = new Intl.DateTimeFormat(config.locale.dateLocale, { weekday: "short", timeZone: "UTC" });
   const days = Array.from({ length: data.days }, (_, i) => `${data.month}-${String(i + 1).padStart(2, "0")}`);
   const onDay = (vehicleId: string, date: string) =>
-    data.rentals.find((r) => r.vehicle.id === vehicleId && r.startDate <= date && date < heldUntil(r, data.today));
+    data.rentals.find((r) => r.vehicle?.id === vehicleId && r.startDate <= date && date < heldUntil(r, data.today));
 
   if (data.vehicles.length === 0) return <EmptyState>No vehicles yet.</EmptyState>;
   return (

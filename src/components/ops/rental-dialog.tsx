@@ -14,16 +14,22 @@ import { Checkbox, Field, Input, Textarea, numberOrUndefined } from "@/component
 import { Badge, ErrorNote, Loading, table } from "@/components/ui/page";
 import { useApiDownload } from "@/lib/api";
 import type { Inspection, RentalDetail } from "@/lib/contract";
-import { useRental, useTenantMutation } from "@/lib/queries";
+import { useAvailability, useRental, useTenantMutation } from "@/lib/queries";
 import { useWorkspace } from "@/lib/workspace";
 
-type Panel = "checkin" | "return" | "payment" | "details" | null;
+type Panel = "checkin" | "return" | "payment" | "details" | "assign" | null;
+
+function vehicleLabel(rental: { vehicle: { plateNumber: string; make: string; model: string } | null; requestedMake: string | null; requestedModel: string | null }) {
+  if (rental.vehicle) return `${rental.vehicle.plateNumber} · ${rental.vehicle.make} ${rental.vehicle.model}`;
+  if (rental.requestedMake && rental.requestedModel) return `${rental.requestedMake} ${rental.requestedModel} (unassigned)`;
+  return "No vehicle";
+}
 
 /** A rental's details, inspections and payments, with the actions the member may take for its status. */
 export function RentalDialog({ rentalId, onClose }: { rentalId: string; onClose: () => void }) {
   const { data: rental, error, isPending } = useRental(rentalId);
   return (
-    <Dialog open onClose={onClose} title={rental ? `${rental.code} · ${rental.vehicle.plateNumber}` : "Rental"} eyebrow="Rental details" width="lg">
+    <Dialog open onClose={onClose} title={rental ? `${rental.code} · ${vehicleLabel(rental)}` : "Rental"} eyebrow="Rental details" width="lg">
       {isPending && <Loading />}
       <ErrorNote error={error} />
       {rental && <RentalDetails rental={rental} onClose={onClose} />}
@@ -64,7 +70,8 @@ function RentalDetails({ rental, onClose }: { rental: RentalDetail; onClose: () 
           {rental.renter.fullName} ({rental.renter.profileId}) · {rental.renter.phone}
         </Item>
         <Item label={f("vehicle").label}>
-          {rental.vehicle.plateNumber} · {rental.vehicle.make} {rental.vehicle.model}
+          {vehicleLabel(rental)}
+          {rental.needsVehicleAssignment && <span className="ml-2 text-xs font-semibold text-amber-700">Assign before handover</span>}
         </Item>
         <Item label="Dates">
           {format.day(rental.startDate)} → {format.day(rental.endDate)} ({rental.totalDays} days)
@@ -96,7 +103,12 @@ function RentalDetails({ rental, onClose }: { rental: RentalDetail; onClose: () 
       </div>
 
       <div className="flex flex-wrap gap-2">
-        {rental.status === "RESERVED" && can("rentals:checkin") && (
+        {rental.status === "RESERVED" && can("rentals:create") && (
+          <Button variant={rental.needsVehicleAssignment ? "primary" : "outline"} onClick={() => toggle("assign")}>
+            {rental.needsVehicleAssignment ? "Assign vehicle" : "Change vehicle"}
+          </Button>
+        )}
+        {rental.status === "RESERVED" && can("rentals:checkin") && !rental.needsVehicleAssignment && (
           <Button variant="primary" onClick={() => toggle("checkin")}>
             Check in &amp; hand over
           </Button>
@@ -145,6 +157,7 @@ function RentalDetails({ rental, onClose }: { rental: RentalDetail; onClose: () 
       <ErrorNote error={cancel.error} />
       <ErrorNote error={confirmPaid.error} />
 
+      {panel === "assign" && <AssignVehicleForm rental={rental} onDone={() => setPanel(null)} />}
       {panel === "checkin" && <HandoverForm rental={rental} kind="checkin" onDone={() => setPanel(null)} />}
       {panel === "return" && <HandoverForm rental={rental} kind="return" onDone={() => setPanel(null)} />}
       {panel === "details" && (
@@ -194,6 +207,90 @@ function RentalDetails({ rental, onClose }: { rental: RentalDetail; onClose: () 
       <div className="flex justify-end border-t border-line pt-4">
         <Button variant="outline" onClick={onClose}>
           Close
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/** Assigns (or reassigns) a registration plate to a RESERVED booking. */
+function AssignVehicleForm({ rental, onDone }: { rental: RentalDetail; onDone: () => void }) {
+  const { format } = useWorkspace();
+  const [vehicleId, setVehicleId] = useState(rental.vehicle?.id ?? "");
+  const availability = useAvailability(rental.startDate, rental.endDate, rental.id);
+  const assign = useTenantMutation((request, body: unknown) =>
+    request<RentalDetail>("POST", `/rentals/${rental.id}/assign-vehicle`, body),
+  );
+
+  const matchesClass = (make: string, model: string) =>
+    !rental.requestedMake ||
+    !rental.requestedModel ||
+    (make.toLowerCase() === rental.requestedMake.toLowerCase() && model.toLowerCase() === rental.requestedModel.toLowerCase());
+
+  const options = (availability.data?.vehicles ?? []).filter((a) => matchesClass(a.vehicle.make, a.vehicle.model));
+
+  return (
+    <div className="space-y-3 border border-brand/30 bg-brand/5 p-4">
+      <h4 className="font-semibold tracking-normal text-ink">
+        {rental.needsVehicleAssignment ? "Assign a vehicle" : "Change vehicle"}
+      </h4>
+      {rental.requestedMake && rental.requestedModel && (
+        <p className="text-sm text-muted">
+          This reservation is for a <strong className="text-ink">{rental.requestedMake} {rental.requestedModel}</strong>.
+        </p>
+      )}
+      {availability.isFetching && <Loading label="Checking availability" />}
+      <ErrorNote error={availability.error} />
+      <div className="grid gap-2 sm:grid-cols-2">
+        {options.map((a) => (
+          <label
+            key={a.vehicle.id}
+            className={`flex items-start gap-3 border bg-panel p-3 ${!a.available ? "opacity-50" : vehicleId === a.vehicle.id ? "border-brand" : "border-ink/15"}`}
+          >
+            <input
+              type="radio"
+              name="assignVehicle"
+              className="mt-0.5 accent-[var(--brand)]"
+              disabled={!a.available && a.vehicle.id !== rental.vehicle?.id}
+              checked={vehicleId === a.vehicle.id}
+              onChange={() => setVehicleId(a.vehicle.id)}
+            />
+            <span className="text-sm">
+              <strong className="text-ink">
+                {a.vehicle.make} {a.vehicle.model}
+              </strong>
+              <br />
+              {a.vehicle.plateNumber} · {format.money(a.dailyRate)}
+              <br />
+              <span className={a.available || a.vehicle.id === rental.vehicle?.id ? "text-emerald-700" : "text-rose-700"}>
+                {a.vehicle.id === rental.vehicle?.id ? "Currently assigned" : (a.reason ?? "Available")}
+              </span>
+            </span>
+          </label>
+        ))}
+      </div>
+      {options.length === 0 && !availability.isFetching && <p className="text-sm text-muted">No matching vehicles for these dates.</p>}
+      <ErrorNote error={assign.error} />
+      <div className="flex justify-end gap-2">
+        <Button variant="outline" onClick={onDone}>
+          Cancel
+        </Button>
+        <Button
+          variant="primary"
+          disabled={!vehicleId || assign.isPending || vehicleId === rental.vehicle?.id}
+          onClick={() =>
+            assign.mutate(
+              { vehicleId },
+              {
+                onSuccess: (updated) => {
+                  toast.success(`${updated.vehicle?.plateNumber ?? "Vehicle"} assigned to ${updated.code}`);
+                  onDone();
+                },
+              },
+            )
+          }
+        >
+          Save assignment
         </Button>
       </div>
     </div>

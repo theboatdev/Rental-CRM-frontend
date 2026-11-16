@@ -105,7 +105,13 @@ export interface TenantConfig {
     dashboard: Toggle;
     vehicles: Toggle & { serviceIntervalKm: number };
     renters: Toggle;
-    rentals: Toggle & { inspectionPoints: string[]; requirePickupInspection: boolean; requireDropInspection: boolean };
+    rentals: Toggle & {
+      inspectionPoints: string[];
+      requirePickupInspection: boolean;
+      requireDropInspection: boolean;
+      /** specificVehicle = plate required; vehicleClass = make/model hold; both = staff choose. */
+      reservationMode: "specificVehicle" | "vehicleClass" | "both";
+    };
     calendar: Toggle;
     payments: Toggle;
     costs: Toggle & { requireBillUpload: boolean };
@@ -312,6 +318,25 @@ export interface Inspection {
   notes: string;
 }
 
+export type ReservationMode = "specificVehicle" | "vehicleClass" | "both";
+
+export interface VehicleClassAvailability {
+  make: string;
+  model: string;
+  fleetCount: number;
+  availableCount: number;
+  dailyRate: number;
+  depositAmount: number;
+  available: boolean;
+  reason: string | null;
+}
+
+export interface AvailabilityResponse {
+  vehicles: Availability[];
+  classes: VehicleClassAvailability[];
+  reservationMode: ReservationMode;
+}
+
 export interface Rental {
   id: string;
   code: string;
@@ -319,7 +344,11 @@ export interface Rental {
   status: RentalStatus;
   overdue: boolean;
   source: "COUNTER" | "ONLINE";
-  vehicle: VehicleRef;
+  /** Null while a make/model hold has no plate assigned yet. */
+  vehicle: VehicleRef | null;
+  requestedMake: string | null;
+  requestedModel: string | null;
+  needsVehicleAssignment: boolean;
   renter: RenterRef;
   /** Calendar dates, YYYY-MM-DD. The rental holds the vehicle up to, not including, the end date. */
   startDate: string;
