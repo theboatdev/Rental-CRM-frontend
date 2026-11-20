@@ -32,7 +32,7 @@ type PickStyle = "vehicle" | "class";
  * by make/model without picking a registration plate yet.
  */
 export function BookingDialog({ defaults, onClose, onBooked }: { defaults: BookingDefaults; onClose: () => void; onBooked?: (rental: RentalDetail) => void }) {
-  const { config, can, moduleOn, format, options, today } = useWorkspace();
+  const { config, can, canSeeBookingPricing, moduleOn, format, options, today } = useWorkspace();
   const renters = useRenters();
   const mode: ReservationMode = config.modules.rentals.reservationMode ?? "specificVehicle";
   const start = defaults.startDate ?? today();
@@ -75,11 +75,16 @@ export function BookingDialog({ defaults, onClose, onBooked }: { defaults: Booki
     (c) => c.make === form.requestedMake && c.model === form.requestedModel,
   );
   const chosen = showVehiclePicker ? chosenVehicle : chosenClass;
-  // With the rate or deposit field off, bookings take the vehicle's (or class sample).
-  const rate = (f("dailyRate").on ? numberOrUndefined(form.dailyRate) : undefined) ?? chosen?.dailyRate ?? 0;
-  const deposit = (f("depositAmount").on ? numberOrUndefined(form.depositAmount) : undefined) ?? chosen?.depositAmount ?? 0;
+  // With the rate or deposit field off (or pricing hidden), bookings take the vehicle's (or class sample).
+  const rate = canSeeBookingPricing
+    ? ((f("dailyRate").on ? numberOrUndefined(form.dailyRate) : undefined) ?? chosen?.dailyRate ?? 0)
+    : 0;
+  const deposit = canSeeBookingPricing
+    ? ((f("depositAmount").on ? numberOrUndefined(form.depositAmount) : undefined) ?? chosen?.depositAmount ?? 0)
+    : 0;
   const isThirdParty = chosenVehicle?.ownership === "THIRD_PARTY";
-  const showSupplierCost = Boolean(config.modules.vehicles.thirdPartyVehicles) && showVehiclePicker && Boolean(isThirdParty);
+  const showSupplierCost =
+    canSeeBookingPricing && Boolean(config.modules.vehicles.thirdPartyVehicles) && showVehiclePicker && Boolean(isThirdParty);
   const supplierCost = showSupplierCost ? (numberOrUndefined(form.supplierRentalCost) ?? 0) : 0;
   const customerRevenue = Math.max(days, 0) * rate;
   const grossProfit = customerRevenue - supplierCost;
@@ -89,8 +94,9 @@ export function BookingDialog({ defaults, onClose, onBooked }: { defaults: Booki
   const issue = (path: string) => book.error?.issueFor(path);
   const fullAmount = customerRevenue + deposit;
   // Handing over with the full amount paid: with payments on, the advance collects all of it, so the ledger agrees.
+  // When pricing is hidden, staff can still confirm full payment but can't auto-collect an unknown total.
   const paysInFull = canHandOver && handOver && fullyPaid;
-  const collectsInFull = paysInFull && canAdvance;
+  const collectsInFull = paysInFull && canAdvance && canSeeBookingPricing;
   const offerFullPayment = !moduleOn("payments") || canAdvance;
   const advanceValue = collectsInFull ? String(fullAmount) : form.advance;
   const selectionReady = showVehiclePicker ? Boolean(chosenVehicle?.available) : Boolean(chosenClass?.available);
@@ -111,7 +117,12 @@ export function BookingDialog({ defaults, onClose, onBooked }: { defaults: Booki
         renterId: form.renterId,
         startDate: form.startDate,
         endDate: form.endDate,
-        ...withoutOff(f, { dailyRate: numberOrUndefined(form.dailyRate), depositAmount: numberOrUndefined(form.depositAmount), notes: form.notes }),
+        ...withoutOff(f, {
+          ...(canSeeBookingPricing
+            ? { dailyRate: numberOrUndefined(form.dailyRate), depositAmount: numberOrUndefined(form.depositAmount) }
+            : {}),
+          notes: form.notes,
+        }),
         ...(showSupplierCost ? { supplierRentalCost: numberOrUndefined(form.supplierRentalCost) ?? 0 } : {}),
         ...(canAdvance && advance
           ? {
@@ -187,7 +198,10 @@ export function BookingDialog({ defaults, onClose, onBooked }: { defaults: Booki
 
         {showVehiclePicker && (
           <fieldset>
-            <legend className="mb-2 text-xs font-semibold tracking-normal text-muted">{f("vehicle").label} · rate per day</legend>
+            <legend className="mb-2 text-xs font-semibold tracking-normal text-muted">
+              {f("vehicle").label}
+              {canSeeBookingPricing ? " · rate per day" : ""}
+            </legend>
             {f("vehicle").help && <p className="mb-2 text-xs text-muted">{f("vehicle").help}</p>}
             {days < 1 && <p className="text-rose-700">The return date must be after the pickup date.</p>}
             {availability.isFetching && <Loading label="Checking availability" />}
@@ -212,7 +226,8 @@ export function BookingDialog({ defaults, onClose, onBooked }: { defaults: Booki
                       {a.vehicle.make} {a.vehicle.model}
                     </strong>
                     <br />
-                    {a.vehicle.plateNumber} · {format.money(a.dailyRate)}
+                    {a.vehicle.plateNumber}
+                    {canSeeBookingPricing && a.dailyRate != null ? ` · ${format.money(a.dailyRate)}` : ""}
                     {config.modules.vehicles.thirdPartyVehicles && a.ownership === "THIRD_PARTY" ? " · Third-party" : ""}
                     <br />
                     <span className={a.available ? "text-emerald-700" : "text-rose-700"}>{a.reason ?? "Available for these dates"}</span>
@@ -226,7 +241,10 @@ export function BookingDialog({ defaults, onClose, onBooked }: { defaults: Booki
 
         {showClassPicker && (
           <fieldset>
-            <legend className="mb-2 text-xs font-semibold tracking-normal text-muted">Vehicle make &amp; model · rate per day</legend>
+            <legend className="mb-2 text-xs font-semibold tracking-normal text-muted">
+              Vehicle make &amp; model
+              {canSeeBookingPricing ? " · rate per day" : ""}
+            </legend>
             <p className="mb-2 text-xs text-muted">Reserve capacity without picking a registration. Assign a plate before handover.</p>
             {days < 1 && <p className="text-rose-700">The return date must be after the pickup date.</p>}
             {availability.isFetching && <Loading label="Checking availability" />}
@@ -253,7 +271,8 @@ export function BookingDialog({ defaults, onClose, onBooked }: { defaults: Booki
                         {c.make} {c.model}
                       </strong>
                       <br />
-                      {c.availableCount} of {c.fleetCount} free · from {format.money(c.dailyRate)}
+                      {c.availableCount} of {c.fleetCount} free
+                      {canSeeBookingPricing && c.dailyRate != null ? ` · from ${format.money(c.dailyRate)}` : ""}
                       <br />
                       <span className={c.available ? "text-emerald-700" : "text-rose-700"}>{c.reason ?? "Available for these dates"}</span>
                     </span>
@@ -267,7 +286,7 @@ export function BookingDialog({ defaults, onClose, onBooked }: { defaults: Booki
           </fieldset>
         )}
 
-        {(f("dailyRate").on || f("depositAmount").on || showSupplierCost) && (
+        {canSeeBookingPricing && (f("dailyRate").on || f("depositAmount").on || showSupplierCost) && (
           <div className="grid gap-3 sm:grid-cols-2">
             {f("dailyRate").on && (
               <Field label={`${f("dailyRate").label} (${config.locale.currency})`} hint={f("dailyRate").help ?? "Defaults to the vehicle's rate"} error={issue("dailyRate")}>
@@ -395,7 +414,9 @@ export function BookingDialog({ defaults, onClose, onBooked }: { defaults: Booki
                   label={
                     <>
                       <span className="font-semibold">Full amount paid</span>
-                      {canAdvance ? `: collect ${format.money(fullAmount)} now (the rental and the deposit)` : ": the renter has paid everything for this rental"}
+                      {canAdvance && canSeeBookingPricing
+                        ? `: collect ${format.money(fullAmount)} now (the rental and the deposit)`
+                        : ": the renter has paid everything for this rental"}
                     </>
                   }
                   checked={fullyPaid}
@@ -412,17 +433,25 @@ export function BookingDialog({ defaults, onClose, onBooked }: { defaults: Booki
         )}
 
         <div className="space-y-1 border border-line bg-paper p-3 text-sm">
-          <p>
-            {Math.max(days, 0)} days × {format.money(rate)} = <strong>{format.money(customerRevenue)}</strong>
-          </p>
-          <p className="text-muted">Refundable security deposit: {format.money(deposit)}</p>
-          {showSupplierCost && (
+          {canSeeBookingPricing ? (
             <>
-              <p className="text-muted">Third-party supplier rental cost: {format.money(supplierCost)}</p>
               <p>
-                Gross profit before other expenses: <strong>{format.money(grossProfit)}</strong>
+                {Math.max(days, 0)} days × {format.money(rate)} = <strong>{format.money(customerRevenue)}</strong>
               </p>
+              <p className="text-muted">Refundable security deposit: {format.money(deposit)}</p>
+              {showSupplierCost && (
+                <>
+                  <p className="text-muted">Third-party supplier rental cost: {format.money(supplierCost)}</p>
+                  <p>
+                    Gross profit before other expenses: <strong>{format.money(grossProfit)}</strong>
+                  </p>
+                </>
+              )}
             </>
+          ) : (
+            <p>
+              {Math.max(days, 0)} day{Math.max(days, 0) === 1 ? "" : "s"} · rates applied from the vehicle
+            </p>
           )}
         </div>
 

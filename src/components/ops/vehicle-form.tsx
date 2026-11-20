@@ -91,7 +91,7 @@ function PhotoInput({
 type DocDraft = { type: string; file: UploadedFile | null; expiresAt: string };
 
 export function VehicleForm({ vehicle, onDone }: { vehicle?: Vehicle; onDone: (saved: Vehicle) => void }) {
-  const { config } = useWorkspace();
+  const { config, canSeeBookingPricing } = useWorkspace();
   const { currency, secondaryCurrency, distanceUnit } = config.locale;
   const { builtIn: f, custom: customFields } = useFields("vehicles");
   const thirdPartyVehicles = Boolean(config.modules.vehicles.thirdPartyVehicles);
@@ -102,9 +102,9 @@ export function VehicleForm({ vehicle, onDone }: { vehicle?: Vehicle; onDone: (s
     year: vehicle ? (vehicle.year !== null ? String(vehicle.year) : "") : String(new Date().getFullYear()),
     transmission: vehicle?.transmission ?? ("AUTOMATIC" as Transmission),
     fuelType: vehicle?.fuelType ?? ("PETROL" as FuelType),
-    dailyRate: vehicle ? String(vehicle.dailyRate) : "",
-    secondaryDailyRate: vehicle?.secondaryDailyRate ? String(vehicle.secondaryDailyRate) : "",
-    depositAmount: vehicle ? String(vehicle.depositAmount) : "",
+    dailyRate: vehicle?.dailyRate != null ? String(vehicle.dailyRate) : "",
+    secondaryDailyRate: vehicle?.secondaryDailyRate != null ? String(vehicle.secondaryDailyRate) : "",
+    depositAmount: vehicle?.depositAmount != null ? String(vehicle.depositAmount) : "",
     mileage: vehicle ? String(vehicle.mileage) : "",
     ownership: (vehicle?.ownership ?? "OWNED") as VehicleOwnership,
     notes: vehicle?.notes ?? "",
@@ -130,7 +130,7 @@ export function VehicleForm({ vehicle, onDone }: { vehicle?: Vehicle; onDone: (s
   );
   const set = (patch: Partial<typeof form>) => setForm((current) => ({ ...current, ...patch }));
   const issue = (path: string) => save.error?.issueFor(path);
-  const showSecondary = Boolean(secondaryCurrency) && f("secondaryDailyRate").on;
+  const showSecondary = canSeeBookingPricing && Boolean(secondaryCurrency) && f("secondaryDailyRate").on;
 
   return (
     <form
@@ -156,8 +156,8 @@ export function VehicleForm({ vehicle, onDone }: { vehicle?: Vehicle; onDone: (s
               year: numberOrUndefined(form.year),
               transmission: form.transmission,
               fuelType: form.fuelType,
-              dailyRate: numberOrUndefined(form.dailyRate),
-              ...(form.depositAmount !== "" ? { depositAmount: numberOrUndefined(form.depositAmount) } : {}),
+              ...(canSeeBookingPricing ? { dailyRate: numberOrUndefined(form.dailyRate) } : {}),
+              ...(canSeeBookingPricing && form.depositAmount !== "" ? { depositAmount: numberOrUndefined(form.depositAmount) } : {}),
               ...(form.mileage !== "" ? { mileage: numberOrUndefined(form.mileage) } : {}),
               ...(photo !== undefined ? { thumbnail: photo } : {}),
               notes: form.notes,
@@ -227,9 +227,11 @@ export function VehicleForm({ vehicle, onDone }: { vehicle?: Vehicle; onDone: (s
         )}
       </div>
       <div className="grid grid-cols-2 gap-3">
-        <Field label={`${f("dailyRate").label} (${currency})`} hint={f("dailyRate").help} error={issue("dailyRate")}>
-          {(id) => <Input id={id} type="number" required min="1" step="any" value={form.dailyRate} onChange={(e) => set({ dailyRate: e.target.value })} />}
-        </Field>
+        {canSeeBookingPricing && (
+          <Field label={`${f("dailyRate").label} (${currency})`} hint={f("dailyRate").help} error={issue("dailyRate")}>
+            {(id) => <Input id={id} type="number" required min="1" step="any" value={form.dailyRate} onChange={(e) => set({ dailyRate: e.target.value })} />}
+          </Field>
+        )}
         {showSecondary && (
           <Field label={`${f("secondaryDailyRate").label} (${secondaryCurrency})`} hint={f("secondaryDailyRate").help ?? "Quoted to tourists"} error={issue("secondaryDailyRate")}>
             {(id) => (
@@ -237,7 +239,7 @@ export function VehicleForm({ vehicle, onDone }: { vehicle?: Vehicle; onDone: (s
             )}
           </Field>
         )}
-        {f("depositAmount").on && (
+        {canSeeBookingPricing && f("depositAmount").on && (
           <Field
             label={`${f("depositAmount").label} (${currency})`}
             hint={f("depositAmount").help ?? (vehicle ? undefined : `Defaults to ${config.rules.defaultDepositAmount}`)}

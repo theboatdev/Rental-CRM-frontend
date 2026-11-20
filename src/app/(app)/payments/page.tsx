@@ -126,7 +126,7 @@ function Payments() {
 }
 
 function RecordPaymentDialog({ onClose }: { onClose: () => void }) {
-  const { format } = useWorkspace();
+  const { format, canSeeBookingPricing } = useWorkspace();
   const rentals = useRentals();
   const [rentalId, setRentalId] = useState("");
   const rental = rentals.data?.find((r) => r.id === rentalId);
@@ -139,7 +139,8 @@ function RecordPaymentDialog({ onClose }: { onClose: () => void }) {
               <option value="">Choose a rental…</option>
               {rentals.data?.map((r) => (
                 <option key={r.id} value={r.id}>
-                  {r.code} — {r.renter.fullName} ({r.vehicle?.plateNumber ?? (`${r.requestedMake ?? ""} ${r.requestedModel ?? ""}`.trim() || "Unassigned")}) · {r.status.toLowerCase()} · owes {format.money(r.balance)}
+                  {r.code} — {r.renter.fullName} ({r.vehicle?.plateNumber ?? (`${r.requestedMake ?? ""} ${r.requestedModel ?? ""}`.trim() || "Unassigned")}) · {r.status.toLowerCase()}
+                  {canSeeBookingPricing && r.balance != null ? ` · owes ${format.money(r.balance)}` : ""}
                 </option>
               ))}
             </Select>

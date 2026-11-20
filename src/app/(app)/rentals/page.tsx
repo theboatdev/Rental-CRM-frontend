@@ -35,7 +35,7 @@ export default function RentalsPage() {
 
 /** Rentals and bookings. `?open=<id>` opens one, `?new=1` starts a booking (links from the dashboard and calendar). */
 function Rentals() {
-  const { can, format } = useWorkspace();
+  const { can, canSeeBookingPricing, format } = useWorkspace();
   const params = useSearchParams();
   const router = useRouter();
   const [filter, setFilter] = useState<RentalStatus | "open" | undefined>(undefined);
@@ -89,8 +89,8 @@ function Rentals() {
                   <th className={table.th}>{field("vehicle").label}</th>
                   <th className={table.th}>{field("renter").label}</th>
                   <th className={table.th}>Dates</th>
-                  <th className={`${table.th} text-right`}>Total</th>
-                  <th className={`${table.th} text-right`}>Outstanding</th>
+                  {canSeeBookingPricing && <th className={`${table.th} text-right`}>Total</th>}
+                  {canSeeBookingPricing && <th className={`${table.th} text-right`}>Outstanding</th>}
                   <th className={`${table.th} text-center`}>Inspection</th>
                   {columns.map((column) => (
                     <th key={column.key} className={table.th}>
@@ -121,14 +121,21 @@ function Rentals() {
                         {format.day(r.startDate)} → {format.day(r.endDate)}
                       </div>
                       <div className="text-xs text-muted">
-                        {r.totalDays} days{listed("dailyRate") ? ` @ ${format.money(r.dailyRate)}` : ""}
+                        {r.totalDays} days
+                        {canSeeBookingPricing && listed("dailyRate") && r.dailyRate != null ? ` @ ${format.money(r.dailyRate)}` : ""}
                       </div>
                     </td>
-                    <td className={`${table.td} text-right font-semibold text-ink`}>{format.money(r.totalAmount)}</td>
-                    <td className={`${table.td} text-right ${r.balance > 0 && r.status !== "CANCELLED" ? "font-semibold text-rose-700" : "text-muted"}`}>
-                      {format.money(r.balance)}
-                      {r.fullPayment && <div className="text-xs font-semibold whitespace-nowrap text-emerald-700">Paid in full</div>}
-                    </td>
+                    {canSeeBookingPricing && (
+                      <td className={`${table.td} text-right font-semibold text-ink`}>
+                        {r.totalAmount != null ? format.money(r.totalAmount) : "—"}
+                      </td>
+                    )}
+                    {canSeeBookingPricing && (
+                      <td className={`${table.td} text-right ${(r.balance ?? 0) > 0 && r.status !== "CANCELLED" ? "font-semibold text-rose-700" : "text-muted"}`}>
+                        {r.balance != null ? format.money(r.balance) : "—"}
+                        {r.fullPayment && <div className="text-xs font-semibold whitespace-nowrap text-emerald-700">Paid in full</div>}
+                      </td>
+                    )}
                     <td className={`${table.td} text-center`}>
                       {r.pickupInspection ? (
                         <span className="inline-flex items-center gap-1 text-xs font-semibold">

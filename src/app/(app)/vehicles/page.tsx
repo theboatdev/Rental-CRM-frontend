@@ -75,16 +75,19 @@ function Vehicles() {
 const NATIVE_FIELDS = ["plateNumber", "make", "model", "year", "transmission", "fuelType", "dailyRate", "secondaryDailyRate", "depositAmount", "mileage", "thumbnail"];
 
 function VehicleCard({ vehicle, onOpen }: { vehicle: VehicleWithStats; onOpen: () => void }) {
-  const { format, config, today } = useWorkspace();
+  const { format, config, today, canSeeBookingPricing } = useWorkspace();
   // The card shows these built-in fields in its own way; the config decides whether each one shows.
   const { listed, columns } = useListColumns<VehicleWithStats>("vehicles", NATIVE_FIELDS);
   const { stats } = vehicle;
   const docAlert = vehicleDocumentAlert(vehicle.documents, config, today());
-  const secondary = listed("secondaryDailyRate") && vehicle.secondaryDailyRate !== null ? format.secondaryMoney(vehicle.secondaryDailyRate) : null;
+  const secondary =
+    canSeeBookingPricing && listed("secondaryDailyRate") && vehicle.secondaryDailyRate != null
+      ? format.secondaryMoney(vehicle.secondaryDailyRate)
+      : null;
   const specs = [listed("transmission") && TRANSMISSION_LABELS[vehicle.transmission], listed("fuelType") && FUEL_LABELS[vehicle.fuelType]].filter(Boolean);
   const figures = [
     listed("mileage") && format.distance(vehicle.mileage),
-    listed("depositAmount") && `deposit ${format.money(vehicle.depositAmount)}`,
+    canSeeBookingPricing && listed("depositAmount") && vehicle.depositAmount != null && `deposit ${format.money(vehicle.depositAmount)}`,
     secondary && `${secondary}/day`,
   ].filter(Boolean);
   return (
@@ -124,9 +127,9 @@ function VehicleCard({ vehicle, onOpen }: { vehicle: VehicleWithStats; onOpen: (
                 {vehicle.make} {vehicle.model}
                 {listed("year") && vehicle.year !== null ? ` (${vehicle.year})` : ""}
               </h3>
-              <span className="text-sm font-semibold whitespace-nowrap text-ink">
-                {format.money(vehicle.dailyRate)}/day
-              </span>
+              {canSeeBookingPricing && vehicle.dailyRate != null && (
+                <span className="text-sm font-semibold whitespace-nowrap text-ink">{format.money(vehicle.dailyRate)}/day</span>
+              )}
             </div>
             {figures.length > 0 && <p className="mt-0.5 font-sans text-xs text-muted">{figures.join(" · ")}</p>}
             {columns.length > 0 && (

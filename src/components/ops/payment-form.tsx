@@ -37,7 +37,7 @@ export function PaymentForm({
   types?: PaymentType[];
   defaultAmount?: number;
 }) {
-  const { config, options, format } = useWorkspace();
+  const { config, options, format, canSeeBookingPricing } = useWorkspace();
   const [form, setForm] = useState({
     type: types[0],
     method: options("paymentMethods")[0]?.key ?? "",
@@ -101,7 +101,13 @@ export function PaymentForm({
       <Field
         label={`${f("amount").label} (${config.locale.currency})`}
         error={issue("amount")}
-        hint={form.type === "REFUND" ? `Paid so far: ${format.money(rental.paidAmount)}` : rental.balance > 0 ? `Outstanding: ${format.money(rental.balance)}` : f("amount").help}
+        hint={
+          form.type === "REFUND"
+            ? `Paid so far: ${format.money(rental.paidAmount)}`
+            : canSeeBookingPricing && rental.balance != null && rental.balance > 0
+              ? `Outstanding: ${format.money(rental.balance)}`
+              : f("amount").help
+        }
       >
         {(id) => <Input id={id} type="number" min="0" step="any" required value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />}
       </Field>

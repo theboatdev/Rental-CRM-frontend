@@ -111,6 +111,8 @@ export interface TenantConfig {
       requireDropInspection: boolean;
       /** specificVehicle = plate required; vehicleClass = make/model hold; both = staff choose. */
       reservationMode: "specificVehicle" | "vehicleClass" | "both";
+      /** When on, roles without financials:view don't see booking/vehicle rates, totals or deposits. */
+      hideBookingPricingWithoutFinancials: boolean;
     };
     calendar: Toggle;
     payments: Toggle;
@@ -205,9 +207,12 @@ export interface Vehicle extends VehicleRef {
   year: number | null;
   transmission: Transmission;
   fuelType: FuelType;
-  dailyRate: number;
-  secondaryDailyRate: number | null;
-  depositAmount: number;
+  /** Absent when booking pricing is hidden from this caller. */
+  dailyRate?: number;
+  /** Absent when booking pricing is hidden from this caller. */
+  secondaryDailyRate?: number | null;
+  /** Absent when booking pricing is hidden from this caller. */
+  depositAmount?: number;
   mileage: number;
   status: VehicleStatus;
   ownership: VehicleOwnership;
@@ -234,8 +239,10 @@ export interface VehicleDossier extends VehicleWithStats {
 export interface Availability {
   vehicle: VehicleRef;
   ownership: VehicleOwnership;
-  dailyRate: number;
-  depositAmount: number;
+  /** Absent when booking pricing is hidden from this caller. */
+  dailyRate?: number;
+  /** Absent when booking pricing is hidden from this caller. */
+  depositAmount?: number;
   available: boolean;
   reason: string | null;
 }
@@ -333,8 +340,10 @@ export interface VehicleClassAvailability {
   model: string;
   fleetCount: number;
   availableCount: number;
-  dailyRate: number;
-  depositAmount: number;
+  /** Absent when booking pricing is hidden from this caller. */
+  dailyRate?: number;
+  /** Absent when booking pricing is hidden from this caller. */
+  depositAmount?: number;
   available: boolean;
   reason: string | null;
 }
@@ -363,13 +372,17 @@ export interface Rental {
   endDate: string;
   actualReturnDate: string | null;
   totalDays: number;
-  dailyRate: number;
-  totalAmount: number;
-  depositAmount: number;
+  /** Absent when booking pricing is hidden from this caller. */
+  dailyRate?: number;
+  /** Absent when booking pricing is hidden from this caller. */
+  totalAmount?: number;
+  /** Absent when booking pricing is hidden from this caller. */
+  depositAmount?: number;
   /** Amount payable to a third-party supplier; present when recorded on the booking. */
   supplierRentalCost?: number;
   paidAmount: number;
-  balance: number;
+  /** Absent when booking pricing is hidden from this caller. */
+  balance?: number;
   depositRefunded: boolean;
   /** Staff confirmed the renter paid the full amount (usually at pickup). Cleared if a void or refund leaves money owed. */
   fullPayment: { at: string; by: Actor | null } | null;

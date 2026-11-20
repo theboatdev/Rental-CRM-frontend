@@ -259,8 +259,10 @@ function formatBuiltIn(key: string, value: unknown, format: Formatters): string 
     }
     case "dailyRate":
     case "depositAmount":
+      if (value == null || value === "") return "—";
       return format.money(Number(value));
     case "secondaryDailyRate":
+      if (value == null || value === "") return "—";
       return format.secondaryMoney(Number(value)) ?? String(value);
     case "mileage":
     case "odometer":

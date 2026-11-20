@@ -36,7 +36,7 @@ export function VehicleDossierDialog({ vehicleId, onClose }: { vehicleId: string
 }
 
 function Dossier({ vehicle, onClose }: { vehicle: VehicleDossier; onClose: () => void }) {
-  const { can, format, config } = useWorkspace();
+  const { can, canSeeBookingPricing, format, config } = useWorkspace();
   const canManage = can("vehicles:update") || can("vehicles:delete");
   // Older published configs may omit vehicleDocumentTypes until republished.
   const vehicleDocTypes = config.lists.vehicleDocumentTypes ?? [];
@@ -52,7 +52,10 @@ function Dossier({ vehicle, onClose }: { vehicle: VehicleDossier; onClose: () =>
   const [tab, setTab] = useState<Tab | undefined>(visible[0]?.key);
   const { builtIn: f } = useFields("vehicles");
   const hasCustomValues = useHasCustomValues("vehicles", vehicle.customFields);
-  const secondary = f("secondaryDailyRate").on && vehicle.secondaryDailyRate !== null ? format.secondaryMoney(vehicle.secondaryDailyRate) : null;
+  const secondary =
+    canSeeBookingPricing && f("secondaryDailyRate").on && vehicle.secondaryDailyRate != null
+      ? format.secondaryMoney(vehicle.secondaryDailyRate)
+      : null;
   const thirdPartyVehicles = Boolean(config.modules.vehicles.thirdPartyVehicles);
   const details: Array<[string, string]> = [
     ...(f("transmission").on ? [[f("transmission").label, TRANSMISSION_LABELS[vehicle.transmission]] as [string, string]] : []),
@@ -67,10 +70,12 @@ function Dossier({ vehicle, onClose }: { vehicle: VehicleDossier; onClose: () =>
     <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-2">
         <VehicleStatusBadge status={vehicle.status} />
-        <span className="text-muted">
-          {format.money(vehicle.dailyRate)}/day
-          {f("depositAmount").on && ` · ${f("depositAmount").label.toLowerCase()} ${format.money(vehicle.depositAmount)}`}
-        </span>
+        {canSeeBookingPricing && vehicle.dailyRate != null && (
+          <span className="text-muted">
+            {format.money(vehicle.dailyRate)}/day
+            {f("depositAmount").on && vehicle.depositAmount != null && ` · ${f("depositAmount").label.toLowerCase()} ${format.money(vehicle.depositAmount)}`}
+          </span>
+        )}
       </div>
 
       {(details.length > 0 || hasCustomValues) && (

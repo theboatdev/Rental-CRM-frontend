@@ -24,7 +24,7 @@ export default function CalendarPage() {
 const heldUntil = (rental: Rental, today: string) => (rental.status === "ACTIVE" && rental.endDate <= today ? addDays(today, 1) : rental.endDate);
 
 function Calendar() {
-  const { can, format, today, config } = useWorkspace();
+  const { can, canSeeBookingPricing, format, today, config } = useWorkspace();
   const [month, setMonth] = useState(() => today().slice(0, 7));
   const [booking, setBooking] = useState<BookingDefaults | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -84,7 +84,7 @@ function Calendar() {
                   <th className={table.th}>Booking</th>
                   <th className={table.th}>Vehicle / renter</th>
                   <th className={table.th}>Dates</th>
-                  <th className={`${table.th} text-right`}>Rental / deposit</th>
+                  {canSeeBookingPricing && <th className={`${table.th} text-right`}>Rental / deposit</th>}
                   <th className={`${table.th} text-right`}>Paid</th>
                 </tr>
               </thead>
@@ -103,11 +103,13 @@ function Calendar() {
                       <br />
                       {r.totalDays} days
                     </td>
-                    <td className={`${table.td} text-right`}>
-                      {format.money(r.totalAmount)}
-                      <br />
-                      <span className="text-muted">{format.money(r.depositAmount)}</span>
-                    </td>
+                    {canSeeBookingPricing && (
+                      <td className={`${table.td} text-right`}>
+                        {r.totalAmount != null ? format.money(r.totalAmount) : "—"}
+                        <br />
+                        <span className="text-muted">{r.depositAmount != null ? format.money(r.depositAmount) : "—"}</span>
+                      </td>
+                    )}
                     <td className={`${table.td} text-right`}>{format.money(r.paidAmount)}</td>
                   </tr>
                 ))}
