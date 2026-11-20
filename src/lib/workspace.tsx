@@ -13,6 +13,13 @@ export interface Workspace {
   /** Whether the member's effective permissions include `permission`. UI only: the API enforces it again. */
   can: (permission: string) => boolean;
   moduleOn: (module: ModuleKey) => boolean;
+  /**
+   * Whether booking/vehicle rates, totals, deposits and outstanding balances
+   * should show. False when the tenant hides booking pricing and the member
+   * lacks financials:view. Payment ledger amounts stay visible either way.
+   * UI only: the API strips the fields too.
+   */
+  canSeeBookingPricing: boolean;
   format: Formatters;
   /** The label of a config list key, e.g. label("paymentMethods", "BANK_TRANSFER"). Records store keys, never labels. */
   label: (list: keyof TenantConfig["lists"], key: string) => string;
@@ -34,15 +41,18 @@ export function WorkspaceProvider({ me, config, children }: { me: Me; config: Co
   const workspace = useMemo<Workspace>(() => {
     const permissions = new Set(me.permissions);
     const tenantConfig = config.config;
+    const can = (permission: string) => permissions.has(permission);
+    const hideBookingPricing = Boolean(tenantConfig.modules.rentals.hideBookingPricingWithoutFinancials);
     return {
       me,
       config: tenantConfig,
       configVersion: config.version,
-      can: (permission) => permissions.has(permission),
+      can,
       moduleOn: (module) => tenantConfig.modules[module].enabled,
+      canSeeBookingPricing: !hideBookingPricing || can("financials:view"),
       format: createFormatters(tenantConfig),
-      label: (list, key) => tenantConfig.lists[list].find((item) => item.key === key)?.label ?? key,
-      options: (list) => tenantConfig.lists[list].filter((item) => item.active).map(({ key, label }) => ({ key, label })),
+      label: (list, key) => (tenantConfig.lists[list] ?? []).find((item) => item.key === key)?.label ?? key,
+      options: (list) => (tenantConfig.lists[list] ?? []).filter((item) => item.active).map(({ key, label }) => ({ key, label })),
       today: () => todayIn(tenantConfig.locale.timezone),
     };
   }, [me, config]);

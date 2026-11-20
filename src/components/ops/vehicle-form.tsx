@@ -5,13 +5,13 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { CustomFieldInputs, customFieldsPayload, draftOf, useFields, withoutOff } from "@/components/ops/fields";
 import { FilePicker, useUploadsInFlight } from "@/components/ops/files";
-import { FUEL_LABELS, TRANSMISSION_LABELS } from "@/components/ops/status";
+import { FUEL_LABELS, OWNERSHIP_LABELS, TRANSMISSION_LABELS } from "@/components/ops/status";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Select, Textarea, numberOrUndefined } from "@/components/ui/field";
 import { ErrorNote } from "@/components/ui/page";
-import type { FuelType, Transmission, UploadedFile, Vehicle } from "@/lib/contract";
+import type { FuelType, Transmission, UploadedFile, Vehicle, VehicleOwnership } from "@/lib/contract";
 import { useTenantMutation } from "@/lib/queries";
-import { PHOTO_ACCEPT, useFileUpload } from "@/lib/uploads";
+import { DOCUMENT_ACCEPT, PHOTO_ACCEPT, useFileUpload } from "@/lib/uploads";
 import { useWorkspace } from "@/lib/workspace";
 
 /**
@@ -87,10 +87,14 @@ function PhotoInput({
  * changes live in the dossier. Labels, help text and which fields show come
  * from the config's `fields.vehicles`.
  */
+/** Draft state for one vehicle compliance document on the create form. */
+type DocDraft = { type: string; file: UploadedFile | null; expiresAt: string };
+
 export function VehicleForm({ vehicle, onDone }: { vehicle?: Vehicle; onDone: (saved: Vehicle) => void }) {
-  const { config } = useWorkspace();
+  const { config, canSeeBookingPricing } = useWorkspace();
   const { currency, secondaryCurrency, distanceUnit } = config.locale;
   const { builtIn: f, custom: customFields } = useFields("vehicles");
+  const thirdPartyVehicles = Boolean(config.modules.vehicles.thirdPartyVehicles);
   const [form, setForm] = useState({
     plateNumber: vehicle?.plateNumber ?? "",
     make: vehicle?.make ?? "",
@@ -98,10 +102,11 @@ export function VehicleForm({ vehicle, onDone }: { vehicle?: Vehicle; onDone: (s
     year: vehicle ? (vehicle.year !== null ? String(vehicle.year) : "") : String(new Date().getFullYear()),
     transmission: vehicle?.transmission ?? ("AUTOMATIC" as Transmission),
     fuelType: vehicle?.fuelType ?? ("PETROL" as FuelType),
-    dailyRate: vehicle ? String(vehicle.dailyRate) : "",
-    secondaryDailyRate: vehicle?.secondaryDailyRate ? String(vehicle.secondaryDailyRate) : "",
-    depositAmount: vehicle ? String(vehicle.depositAmount) : "",
+    dailyRate: vehicle?.dailyRate != null ? String(vehicle.dailyRate) : "",
+    secondaryDailyRate: vehicle?.secondaryDailyRate != null ? String(vehicle.secondaryDailyRate) : "",
+    depositAmount: vehicle?.depositAmount != null ? String(vehicle.depositAmount) : "",
     mileage: vehicle ? String(vehicle.mileage) : "",
+    ownership: (vehicle?.ownership ?? "OWNED") as VehicleOwnership,
     notes: vehicle?.notes ?? "",
   });
   const [savedPhoto, setSavedPhoto] = useState(vehicle?.thumbnail ?? null);
@@ -109,18 +114,39 @@ export function VehicleForm({ vehicle, onDone }: { vehicle?: Vehicle; onDone: (s
   const { uploading, onBusy } = useUploadsInFlight();
   const [initialCustom, setInitialCustom] = useState(() => draftOf(customFields, vehicle?.customFields));
   const [custom, setCustom] = useState(initialCustom);
+
+  // Document drafts are only used on create (the dossier Documents tab handles edits).
+  // Older published configs may omit vehicleDocumentTypes until republished.
+  const activeDocTypes = !vehicle ? (config.lists.vehicleDocumentTypes ?? []).filter((t) => t.active) : [];
+  const [docDrafts, setDocDrafts] = useState<DocDraft[]>(() =>
+    activeDocTypes.map((t) => ({ type: t.key, file: null, expiresAt: "" })),
+  );
+  const updateDoc = (index: number, patch: Partial<DocDraft>) =>
+    setDocDrafts((current) => current.map((d, i) => (i === index ? { ...d, ...patch } : d)));
+  const uploadVehicleDoc = useFileUpload("vehicleDocument");
+
   const save = useTenantMutation((request, body: unknown) =>
     vehicle ? request<Vehicle>("PATCH", `/vehicles/${vehicle.id}`, body) : request<Vehicle>("POST", "/vehicles", body),
   );
   const set = (patch: Partial<typeof form>) => setForm((current) => ({ ...current, ...patch }));
   const issue = (path: string) => save.error?.issueFor(path);
-  const showSecondary = Boolean(secondaryCurrency) && f("secondaryDailyRate").on;
+  const showSecondary = canSeeBookingPricing && Boolean(secondaryCurrency) && f("secondaryDailyRate").on;
 
   return (
     <form
       className="space-y-3"
       onSubmit={(event) => {
         event.preventDefault();
+        // Build the documents array only for create (not update).
+        const documents = !vehicle
+          ? docDrafts
+              .filter((d) => d.file || d.expiresAt)
+              .map((d) => ({
+                type: d.type,
+                ...(d.expiresAt ? { expiresAt: d.expiresAt } : {}),
+                ...(d.file ? { file: d.file } : {}),
+              }))
+          : undefined;
         save.mutate(
           {
             ...withoutOff(f, {
@@ -130,14 +156,16 @@ export function VehicleForm({ vehicle, onDone }: { vehicle?: Vehicle; onDone: (s
               year: numberOrUndefined(form.year),
               transmission: form.transmission,
               fuelType: form.fuelType,
-              dailyRate: numberOrUndefined(form.dailyRate),
-              ...(form.depositAmount !== "" ? { depositAmount: numberOrUndefined(form.depositAmount) } : {}),
+              ...(canSeeBookingPricing ? { dailyRate: numberOrUndefined(form.dailyRate) } : {}),
+              ...(canSeeBookingPricing && form.depositAmount !== "" ? { depositAmount: numberOrUndefined(form.depositAmount) } : {}),
               ...(form.mileage !== "" ? { mileage: numberOrUndefined(form.mileage) } : {}),
               ...(photo !== undefined ? { thumbnail: photo } : {}),
               notes: form.notes,
             }),
             ...(showSecondary ? { secondaryDailyRate: numberOrUndefined(form.secondaryDailyRate) ?? null } : {}),
+            ...(thirdPartyVehicles ? { ownership: form.ownership } : {}),
             customFields: customFieldsPayload(customFields, custom, vehicle ? initialCustom : undefined),
+            ...(documents !== undefined ? { documents } : {}),
           },
           {
             onSuccess: (saved) => {
@@ -199,9 +227,11 @@ export function VehicleForm({ vehicle, onDone }: { vehicle?: Vehicle; onDone: (s
         )}
       </div>
       <div className="grid grid-cols-2 gap-3">
-        <Field label={`${f("dailyRate").label} (${currency})`} hint={f("dailyRate").help} error={issue("dailyRate")}>
-          {(id) => <Input id={id} type="number" required min="1" step="any" value={form.dailyRate} onChange={(e) => set({ dailyRate: e.target.value })} />}
-        </Field>
+        {canSeeBookingPricing && (
+          <Field label={`${f("dailyRate").label} (${currency})`} hint={f("dailyRate").help} error={issue("dailyRate")}>
+            {(id) => <Input id={id} type="number" required min="1" step="any" value={form.dailyRate} onChange={(e) => set({ dailyRate: e.target.value })} />}
+          </Field>
+        )}
         {showSecondary && (
           <Field label={`${f("secondaryDailyRate").label} (${secondaryCurrency})`} hint={f("secondaryDailyRate").help ?? "Quoted to tourists"} error={issue("secondaryDailyRate")}>
             {(id) => (
@@ -209,7 +239,7 @@ export function VehicleForm({ vehicle, onDone }: { vehicle?: Vehicle; onDone: (s
             )}
           </Field>
         )}
-        {f("depositAmount").on && (
+        {canSeeBookingPricing && f("depositAmount").on && (
           <Field
             label={`${f("depositAmount").label} (${currency})`}
             hint={f("depositAmount").help ?? (vehicle ? undefined : `Defaults to ${config.rules.defaultDepositAmount}`)}
@@ -224,6 +254,23 @@ export function VehicleForm({ vehicle, onDone }: { vehicle?: Vehicle; onDone: (s
           </Field>
         )}
       </div>
+      {thirdPartyVehicles && (
+        <Field
+          label={f("ownership").on ? f("ownership").label : "Ownership"}
+          hint={f("ownership").help}
+          error={issue("ownership")}
+        >
+          {(id) => (
+            <Select id={id} value={form.ownership} onChange={(e) => set({ ownership: e.target.value as VehicleOwnership })}>
+              {Object.entries(OWNERSHIP_LABELS).map(([key, label]) => (
+                <option key={key} value={key}>
+                  {label}
+                </option>
+              ))}
+            </Select>
+          )}
+        </Field>
+      )}
       {f("thumbnail").on && (
         <PhotoInput
           label={f("thumbnail").label}
@@ -244,6 +291,41 @@ export function VehicleForm({ vehicle, onDone }: { vehicle?: Vehicle; onDone: (s
       {customFields.length > 0 && (
         <div className="grid grid-cols-2 gap-3">
           <CustomFieldInputs section="vehicles" fields={customFields} draft={custom} onChange={setCustom} onBusy={onBusy} issue={issue} />
+        </div>
+      )}
+      {/* Document upload section — only shown when creating a new vehicle */}
+      {!vehicle && activeDocTypes.length > 0 && (
+        <div className="space-y-3 border-t border-line pt-4">
+          <p className="text-xs font-semibold tracking-normal text-ink">Compliance Documents</p>
+          {docDrafts.map((draft, index) => {
+            const docType = activeDocTypes[index];
+            if (!docType) return null;
+            return (
+              <div key={draft.type} className="rounded-md border border-line p-3 space-y-2">
+                <p className="text-xs font-semibold text-ink">{docType.label}</p>
+                <FilePicker
+                  label="Upload document"
+                  upload={uploadVehicleDoc}
+                  value={draft.file}
+                  onChange={(file) => updateDoc(index, { file })}
+                  onBusy={onBusy}
+                  accept={DOCUMENT_ACCEPT}
+                  hint="PDF, JPG or PNG"
+                  compact
+                />
+                <Field label="Expiry date" error={issue(`documents[${index}].expiresAt`)}>
+                  {(id) => (
+                    <Input
+                      id={id}
+                      type="date"
+                      value={draft.expiresAt}
+                      onChange={(e) => updateDoc(index, { expiresAt: e.target.value })}
+                    />
+                  )}
+                </Field>
+              </div>
+            );
+          })}
         </div>
       )}
       <ErrorNote error={save.error} />

@@ -1,21 +1,25 @@
 "use client";
 
-import { Fuel, Settings, Users, Wrench } from "lucide-react";
+import { FileText, Fuel, Settings, Users, Wrench } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { CostForm, FuelForm } from "@/components/ops/cost-forms";
 import { CustomFieldList, useFields, useHasCustomValues } from "@/components/ops/fields";
-import { FileLink } from "@/components/ops/files";
-import { FUEL_LABELS, RentalStatusBadge, TRANSMISSION_LABELS, VehicleStatusBadge } from "@/components/ops/status";
+import { FilePicker, FileLink, useUploadsInFlight } from "@/components/ops/files";
+import { DOCUMENT_ACCEPT } from "@/lib/uploads";
+import { FUEL_LABELS, OWNERSHIP_LABELS, RentalStatusBadge, TRANSMISSION_LABELS, VehicleStatusBadge } from "@/components/ops/status";
 import { VehicleForm } from "@/components/ops/vehicle-form";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
+import { Field, Input } from "@/components/ui/field";
 import { EmptyState, ErrorNote, Loading, table } from "@/components/ui/page";
-import type { Vehicle, VehicleDossier } from "@/lib/contract";
+import type { UploadedFile, Vehicle, VehicleDocument, VehicleDossier } from "@/lib/contract";
 import { useTenantMutation, useVehicle } from "@/lib/queries";
+import { useFileUpload } from "@/lib/uploads";
+import { documentExpiryStatus } from "@/lib/vehicle-documents";
 import { useWorkspace } from "@/lib/workspace";
 
-type Tab = "rentals" | "service" | "fuel" | "manage";
+type Tab = "rentals" | "service" | "fuel" | "documents" | "manage";
 
 /** A vehicle's dossier: key figures, rental history, service costs, fuel, and (with permission) its settings. */
 export function VehicleDossierDialog({ vehicleId, onClose }: { vehicleId: string; onClose: () => void }) {
@@ -32,22 +36,31 @@ export function VehicleDossierDialog({ vehicleId, onClose }: { vehicleId: string
 }
 
 function Dossier({ vehicle, onClose }: { vehicle: VehicleDossier; onClose: () => void }) {
-  const { can, format } = useWorkspace();
+  const { can, canSeeBookingPricing, format, config } = useWorkspace();
   const canManage = can("vehicles:update") || can("vehicles:delete");
+  // Older published configs may omit vehicleDocumentTypes until republished.
+  const vehicleDocTypes = config.lists.vehicleDocumentTypes ?? [];
+  const hasDocTypes = vehicleDocTypes.length > 0;
   const tabs: Array<{ key: Tab; label: string; icon: ReactNode; show: boolean }> = [
     { key: "rentals", label: `Rentals (${vehicle.rentals?.length ?? 0})`, icon: <Users size={14} />, show: vehicle.rentals !== null },
     { key: "service", label: `Service (${vehicle.costs?.length ?? 0})`, icon: <Wrench size={14} />, show: vehicle.costs !== null },
     { key: "fuel", label: `Fuel (${vehicle.fuelLogs?.length ?? 0})`, icon: <Fuel size={14} />, show: vehicle.fuelLogs !== null },
+    { key: "documents", label: `Documents (${vehicle.documents?.length ?? 0})`, icon: <FileText size={14} />, show: hasDocTypes },
     { key: "manage", label: "Manage", icon: <Settings size={14} />, show: canManage },
   ];
   const visible = tabs.filter((t) => t.show);
   const [tab, setTab] = useState<Tab | undefined>(visible[0]?.key);
   const { builtIn: f } = useFields("vehicles");
   const hasCustomValues = useHasCustomValues("vehicles", vehicle.customFields);
-  const secondary = f("secondaryDailyRate").on && vehicle.secondaryDailyRate !== null ? format.secondaryMoney(vehicle.secondaryDailyRate) : null;
+  const secondary =
+    canSeeBookingPricing && f("secondaryDailyRate").on && vehicle.secondaryDailyRate != null
+      ? format.secondaryMoney(vehicle.secondaryDailyRate)
+      : null;
+  const thirdPartyVehicles = Boolean(config.modules.vehicles.thirdPartyVehicles);
   const details: Array<[string, string]> = [
     ...(f("transmission").on ? [[f("transmission").label, TRANSMISSION_LABELS[vehicle.transmission]] as [string, string]] : []),
     ...(f("fuelType").on ? [[f("fuelType").label, FUEL_LABELS[vehicle.fuelType]] as [string, string]] : []),
+    ...(thirdPartyVehicles ? [["Ownership", OWNERSHIP_LABELS[vehicle.ownership ?? "OWNED"]] as [string, string]] : []),
     ...(secondary ? [[f("secondaryDailyRate").label, `${secondary}/day`] as [string, string]] : []),
     ...(f("notes").on && vehicle.notes ? [[f("notes").label, vehicle.notes] as [string, string]] : []),
   ];
@@ -57,10 +70,12 @@ function Dossier({ vehicle, onClose }: { vehicle: VehicleDossier; onClose: () =>
     <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-2">
         <VehicleStatusBadge status={vehicle.status} />
-        <span className="text-muted">
-          {format.money(vehicle.dailyRate)}/day
-          {f("depositAmount").on && ` · ${f("depositAmount").label.toLowerCase()} ${format.money(vehicle.depositAmount)}`}
-        </span>
+        {canSeeBookingPricing && vehicle.dailyRate != null && (
+          <span className="text-muted">
+            {format.money(vehicle.dailyRate)}/day
+            {f("depositAmount").on && vehicle.depositAmount != null && ` · ${f("depositAmount").label.toLowerCase()} ${format.money(vehicle.depositAmount)}`}
+          </span>
+        )}
       </div>
 
       {(details.length > 0 || hasCustomValues) && (
@@ -80,6 +95,14 @@ function Dossier({ vehicle, onClose }: { vehicle: VehicleDossier; onClose: () =>
         <Metric label="Odometer" value={format.distance(vehicle.mileage)} note={`${format.distance(stats.distance)} by renters`} />
         {stats.serviceCosts !== undefined && <Metric label="Service costs" value={format.money(stats.serviceCosts)} tone="rose" />}
         {stats.fuelCosts !== undefined && <Metric label="Fuel" value={`${format.number(stats.fuelLiters ?? 0)} L`} note={format.money(stats.fuelCosts)} tone="amber" />}
+        {stats.grossProfit !== undefined && (
+          <Metric
+            label="Gross profit"
+            value={format.money(stats.grossProfit)}
+            note={stats.supplierCosts !== undefined ? `${format.money(stats.supplierCosts)} supplier` : undefined}
+            tone={stats.grossProfit >= 0 ? "green" : "rose"}
+          />
+        )}
         {stats.profit !== undefined && <Metric label="Net profit" value={format.money(stats.profit)} note={stats.revenue !== undefined ? `on ${format.money(stats.revenue)}` : undefined} tone={stats.profit >= 0 ? "green" : "rose"} />}
       </div>
 
@@ -100,6 +123,7 @@ function Dossier({ vehicle, onClose }: { vehicle: VehicleDossier; onClose: () =>
       {tab === "rentals" && vehicle.rentals && <RentalHistory vehicle={vehicle} />}
       {tab === "service" && vehicle.costs && <ServiceHistory vehicle={vehicle} />}
       {tab === "fuel" && vehicle.fuelLogs && <FuelHistory vehicle={vehicle} />}
+      {tab === "documents" && <VehicleDocuments vehicle={vehicle} />}
       {tab === "manage" && <Manage vehicle={vehicle} onDeleted={onClose} />}
     </div>
   );
@@ -284,6 +308,171 @@ function Manage({ vehicle, onDeleted }: { vehicle: Vehicle; onDeleted: () => voi
         </div>
       )}
       <ErrorNote error={remove.error} />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Vehicle documents (compliance documents: insurance, revenue licence, etc.)
+// ---------------------------------------------------------------------------
+
+function VehicleDocuments({ vehicle }: { vehicle: VehicleDossier }) {
+  const { can, config, today } = useWorkspace();
+  const canEdit = can("vehicles:update");
+  const docTypes = (config.lists.vehicleDocumentTypes ?? []).filter((t) => t.active);
+  const uploadDoc = useFileUpload("vehicleDocument");
+  const { onBusy } = useUploadsInFlight();
+
+  // Find the existing document for a given type key (last one if multiple).
+  const existingDoc = (typeKey: string) => [...(vehicle.documents ?? [])].reverse().find((d) => d.type === typeKey) ?? null;
+
+  if (docTypes.length === 0) return <EmptyState>No document types configured for this tenant.</EmptyState>;
+
+  return (
+    <div className="space-y-4">
+      {docTypes.map((docType) => (
+        <DocumentCard
+          key={docType.key}
+          vehicleId={vehicle.id}
+          docType={{ key: docType.key, label: docType.label, alertDaysBefore: docType.alertDaysBefore }}
+          document={existingDoc(docType.key)}
+          today={today()}
+          canEdit={canEdit}
+          upload={uploadDoc}
+          onBusy={onBusy}
+        />
+      ))}
+    </div>
+  );
+}
+
+function DocumentCard({
+  vehicleId,
+  docType,
+  document,
+  today,
+  canEdit,
+  upload,
+  onBusy,
+}: {
+  vehicleId: string;
+  docType: { key: string; label: string; alertDaysBefore: number };
+  document: VehicleDocument | null;
+  today: string;
+  canEdit: boolean;
+  upload: (file: File) => Promise<UploadedFile>;
+  onBusy: (busy: boolean) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [expiresAt, setExpiresAt] = useState(document?.expiresAt ?? "");
+
+  const addDoc = useTenantMutation((request, body: unknown) =>
+    request<Vehicle>("POST", `/vehicles/${vehicleId}/documents`, body),
+  );
+  const replaceFile = useTenantMutation((request, body: unknown) =>
+    request<Vehicle>("PUT", `/vehicles/${vehicleId}/documents/${document?.id}/file`, body),
+  );
+  const updateDoc = useTenantMutation((request, body: unknown) =>
+    request<Vehicle>("PATCH", `/vehicles/${vehicleId}/documents/${document?.id}`, body),
+  );
+
+  const status = documentExpiryStatus(document?.expiresAt, today, docType.alertDaysBefore);
+  const toneClass = {
+    ok: "text-emerald-700",
+    warn: "text-amber-700",
+    expired: "text-rose-700",
+    none: "text-muted",
+  }[status.tone];
+
+  const handleReplaceFile = (file: UploadedFile | null) => {
+    if (!file) return;
+    if (!document) {
+      addDoc.mutate(
+        { type: docType.key, file },
+        { onSuccess: () => toast.success(`${docType.label} file uploaded`) },
+      );
+    } else {
+      replaceFile.mutate(
+        { file },
+        { onSuccess: () => toast.success(`${docType.label} file replaced`) },
+      );
+    }
+  };
+
+  const handleSaveDetails = () => {
+    if (!document) {
+      addDoc.mutate(
+        { type: docType.key, ...(expiresAt ? { expiresAt } : {}) },
+        {
+          onSuccess: () => {
+            toast.success(`${docType.label} saved`);
+            setEditing(false);
+          },
+        },
+      );
+    } else {
+      updateDoc.mutate(
+        { expiresAt: expiresAt || null },
+        {
+          onSuccess: () => {
+            toast.success(`${docType.label} updated`);
+            setEditing(false);
+          },
+        },
+      );
+    }
+  };
+
+  return (
+    <div className="rounded-md border border-line p-4 space-y-3">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-ink">{docType.label}</p>
+          <p className={`text-xs font-medium ${toneClass}`}>{status.label}</p>
+        </div>
+        {canEdit && (
+          <Button size="sm" variant="outline" onClick={() => { setEditing((e) => !e); setExpiresAt(document?.expiresAt ?? ""); }}>
+            {editing ? "Cancel" : document ? "Edit expiry" : "Add expiry"}
+          </Button>
+        )}
+      </div>
+
+      {document?.file && <FileLink file={document.file} label="View document" />}
+
+      {canEdit && (
+        <FilePicker
+          label={document?.file ? "Replace file" : "Upload file"}
+          upload={upload}
+          value={null}
+          onChange={handleReplaceFile}
+          onBusy={onBusy}
+          accept={DOCUMENT_ACCEPT}
+          hint="PDF, JPG or PNG"
+          compact
+        />
+      )}
+
+      {editing && canEdit && (
+        <div className="space-y-2 border-t border-line pt-3">
+          <Field label="Expiry date">
+            {(id) => (
+              <Input id={id} type="date" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} />
+            )}
+          </Field>
+          <ErrorNote error={addDoc.error ?? updateDoc.error} />
+          <div className="flex justify-end">
+            <Button
+              size="sm"
+              variant="primary"
+              disabled={addDoc.isPending || updateDoc.isPending}
+              onClick={handleSaveDetails}
+            >
+              Save
+            </Button>
+          </div>
+        </div>
+      )}
+      <ErrorNote error={replaceFile.error} />
     </div>
   );
 }

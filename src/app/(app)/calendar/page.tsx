@@ -24,7 +24,7 @@ export default function CalendarPage() {
 const heldUntil = (rental: Rental, today: string) => (rental.status === "ACTIVE" && rental.endDate <= today ? addDays(today, 1) : rental.endDate);
 
 function Calendar() {
-  const { can, format, today, config } = useWorkspace();
+  const { can, canSeeBookingPricing, format, today, config } = useWorkspace();
   const [month, setMonth] = useState(() => today().slice(0, 7));
   const [booking, setBooking] = useState<BookingDefaults | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -84,7 +84,7 @@ function Calendar() {
                   <th className={table.th}>Booking</th>
                   <th className={table.th}>Vehicle / renter</th>
                   <th className={table.th}>Dates</th>
-                  <th className={`${table.th} text-right`}>Rental / deposit</th>
+                  {canSeeBookingPricing && <th className={`${table.th} text-right`}>Rental / deposit</th>}
                   <th className={`${table.th} text-right`}>Paid</th>
                 </tr>
               </thead>
@@ -93,7 +93,8 @@ function Calendar() {
                   <tr key={r.id} className={`${table.row} cursor-pointer`} onClick={() => setOpenId(r.id)}>
                     <td className={`${table.td} font-semibold`}>{r.code}</td>
                     <td className={table.td}>
-                      {r.vehicle.plateNumber}
+                      {r.vehicle?.plateNumber ?? (`${r.requestedMake ?? ""} ${r.requestedModel ?? ""}`.trim() || "Unassigned")}
+                      {!r.vehicle && <span className="block text-xs text-amber-700">Assign plate</span>}
                       <br />
                       {r.renter.fullName} · {r.renter.phone}
                     </td>
@@ -102,11 +103,13 @@ function Calendar() {
                       <br />
                       {r.totalDays} days
                     </td>
-                    <td className={`${table.td} text-right`}>
-                      {format.money(r.totalAmount)}
-                      <br />
-                      <span className="text-muted">{format.money(r.depositAmount)}</span>
-                    </td>
+                    {canSeeBookingPricing && (
+                      <td className={`${table.td} text-right`}>
+                        {r.totalAmount != null ? format.money(r.totalAmount) : "—"}
+                        <br />
+                        <span className="text-muted">{r.depositAmount != null ? format.money(r.depositAmount) : "—"}</span>
+                      </td>
+                    )}
                     <td className={`${table.td} text-right`}>{format.money(r.paidAmount)}</td>
                   </tr>
                 ))}
@@ -127,7 +130,7 @@ function Grid({ data, canBook, onBook, onOpen }: { data: CalendarMonth; canBook:
   const weekday = new Intl.DateTimeFormat(config.locale.dateLocale, { weekday: "short", timeZone: "UTC" });
   const days = Array.from({ length: data.days }, (_, i) => `${data.month}-${String(i + 1).padStart(2, "0")}`);
   const onDay = (vehicleId: string, date: string) =>
-    data.rentals.find((r) => r.vehicle.id === vehicleId && r.startDate <= date && date < heldUntil(r, data.today));
+    data.rentals.find((r) => r.vehicle?.id === vehicleId && r.startDate <= date && date < heldUntil(r, data.today));
 
   if (data.vehicles.length === 0) return <EmptyState>No vehicles yet.</EmptyState>;
   return (

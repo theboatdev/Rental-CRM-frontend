@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Checkbox, Field, Input, Select, Textarea, numberOrUndefined } from "@/components/ui/field";
 import { ErrorNote, Loading } from "@/components/ui/page";
-import type { RentalDetail } from "@/lib/contract";
+import type { RentalDetail, ReservationMode } from "@/lib/contract";
 import { addDays, daysBetween } from "@/lib/dates";
 import { useAvailability, useRenters, useTenantMutation } from "@/lib/queries";
 import { useWorkspace } from "@/lib/workspace";
@@ -19,24 +19,35 @@ export interface BookingDefaults {
   startDate?: string;
 }
 
+type PickStyle = "vehicle" | "class";
+
 /**
  * Books a vehicle for a renter (POST /rentals). The backend checks the dates,
  * availability and amounts; this form shows its availability per vehicle and
  * any field issues. Optionally records an advance, and when the booking starts
  * today, hands the vehicle over at once. Labels and which fields show come
  * from the config's `fields.rentals`, and `fields.payments` for the advance.
+ *
+ * When `modules.rentals.reservationMode` allows class holds, staff can reserve
+ * by make/model without picking a registration plate yet.
  */
 export function BookingDialog({ defaults, onClose, onBooked }: { defaults: BookingDefaults; onClose: () => void; onBooked?: (rental: RentalDetail) => void }) {
-  const { config, can, moduleOn, format, options, today } = useWorkspace();
+  const { config, can, canSeeBookingPricing, moduleOn, format, options, today } = useWorkspace();
   const renters = useRenters();
+  const mode: ReservationMode = config.modules.rentals.reservationMode ?? "specificVehicle";
   const start = defaults.startDate ?? today();
+  const initialStyle: PickStyle = defaults.vehicleId || mode === "specificVehicle" ? "vehicle" : mode === "vehicleClass" ? "class" : "vehicle";
+  const [pickStyle, setPickStyle] = useState<PickStyle>(initialStyle);
   const [form, setForm] = useState({
     renterId: "",
     vehicleId: defaults.vehicleId ?? "",
+    requestedMake: "",
+    requestedModel: "",
     startDate: start,
     endDate: addDays(start, Math.max(3, config.rules.minRentalDays)),
     dailyRate: "",
     depositAmount: "",
+    supplierRentalCost: "",
     advance: "",
     method: options("paymentMethods")[0]?.key ?? "",
     advanceReference: "",
@@ -57,30 +68,62 @@ export function BookingDialog({ defaults, onClose, onBooked }: { defaults: Booki
 
   const set = (patch: Partial<typeof form>) => setForm((current) => ({ ...current, ...patch }));
   const days = form.startDate && form.endDate ? daysBetween(form.startDate, form.endDate) : 0;
-  const chosen = availability.data?.find((a) => a.vehicle.id === form.vehicleId);
-  // With the rate or deposit field off, bookings take the vehicle's.
-  const rate = (f("dailyRate").on ? numberOrUndefined(form.dailyRate) : undefined) ?? chosen?.dailyRate ?? 0;
-  const deposit = (f("depositAmount").on ? numberOrUndefined(form.depositAmount) : undefined) ?? chosen?.depositAmount ?? 0;
+  const showVehiclePicker = mode === "specificVehicle" || (mode === "both" && pickStyle === "vehicle");
+  const showClassPicker = mode === "vehicleClass" || (mode === "both" && pickStyle === "class");
+  const chosenVehicle = availability.data?.vehicles.find((a) => a.vehicle.id === form.vehicleId);
+  const chosenClass = availability.data?.classes.find(
+    (c) => c.make === form.requestedMake && c.model === form.requestedModel,
+  );
+  const chosen = showVehiclePicker ? chosenVehicle : chosenClass;
+  // With the rate or deposit field off (or pricing hidden), bookings take the vehicle's (or class sample).
+  const rate = canSeeBookingPricing
+    ? ((f("dailyRate").on ? numberOrUndefined(form.dailyRate) : undefined) ?? chosen?.dailyRate ?? 0)
+    : 0;
+  const deposit = canSeeBookingPricing
+    ? ((f("depositAmount").on ? numberOrUndefined(form.depositAmount) : undefined) ?? chosen?.depositAmount ?? 0)
+    : 0;
+  const isThirdParty = chosenVehicle?.ownership === "THIRD_PARTY";
+  const showSupplierCost =
+    canSeeBookingPricing && Boolean(config.modules.vehicles.thirdPartyVehicles) && showVehiclePicker && Boolean(isThirdParty);
+  const supplierCost = showSupplierCost ? (numberOrUndefined(form.supplierRentalCost) ?? 0) : 0;
+  const customerRevenue = Math.max(days, 0) * rate;
+  const grossProfit = customerRevenue - supplierCost;
   const canAdvance = moduleOn("payments") && can("payments:record");
   const startsToday = form.startDate === today();
-  const canHandOver = startsToday && can("rentals:checkin");
+  const canHandOver = startsToday && can("rentals:checkin") && showVehiclePicker;
   const issue = (path: string) => book.error?.issueFor(path);
-  const fullAmount = Math.max(days, 0) * rate + deposit;
+  const fullAmount = customerRevenue + deposit;
   // Handing over with the full amount paid: with payments on, the advance collects all of it, so the ledger agrees.
+  // When pricing is hidden, staff can still confirm full payment but can't auto-collect an unknown total.
   const paysInFull = canHandOver && handOver && fullyPaid;
-  const collectsInFull = paysInFull && canAdvance;
+  const collectsInFull = paysInFull && canAdvance && canSeeBookingPricing;
   const offerFullPayment = !moduleOn("payments") || canAdvance;
   const advanceValue = collectsInFull ? String(fullAmount) : form.advance;
+  const selectionReady = showVehiclePicker ? Boolean(chosenVehicle?.available) : Boolean(chosenClass?.available);
+
+  const switchStyle = (next: PickStyle) => {
+    setPickStyle(next);
+    setHandOver(false);
+    set({ vehicleId: "", requestedMake: "", requestedModel: "", dailyRate: "", depositAmount: "", supplierRentalCost: "" });
+  };
 
   const submit = () => {
     const advance = numberOrUndefined(advanceValue);
     book.mutate(
       {
-        vehicleId: form.vehicleId,
+        ...(showVehiclePicker
+          ? { vehicleId: form.vehicleId }
+          : { requestedMake: form.requestedMake, requestedModel: form.requestedModel }),
         renterId: form.renterId,
         startDate: form.startDate,
         endDate: form.endDate,
-        ...withoutOff(f, { dailyRate: numberOrUndefined(form.dailyRate), depositAmount: numberOrUndefined(form.depositAmount), notes: form.notes }),
+        ...withoutOff(f, {
+          ...(canSeeBookingPricing
+            ? { dailyRate: numberOrUndefined(form.dailyRate), depositAmount: numberOrUndefined(form.depositAmount) }
+            : {}),
+          notes: form.notes,
+        }),
+        ...(showSupplierCost ? { supplierRentalCost: numberOrUndefined(form.supplierRentalCost) ?? 0 } : {}),
         ...(canAdvance && advance
           ? {
               advance: {
@@ -139,43 +182,111 @@ export function BookingDialog({ defaults, onClose, onBooked }: { defaults: Booki
           </Field>
         </div>
 
-        <fieldset>
-          <legend className="mb-2 text-xs font-semibold tracking-normal text-muted">{f("vehicle").label} · rate per day</legend>
-          {f("vehicle").help && <p className="mb-2 text-xs text-muted">{f("vehicle").help}</p>}
-          {days < 1 && <p className="text-rose-700">The return date must be after the pickup date.</p>}
-          {availability.isFetching && <Loading label="Checking availability" />}
-          <ErrorNote error={availability.error} />
-          <div className="grid gap-2 sm:grid-cols-2">
-            {availability.data?.map((a) => (
-              <label
-                key={a.vehicle.id}
-                className={`flex items-start gap-3 border p-3 ${!a.available ? "bg-paper opacity-50" : form.vehicleId === a.vehicle.id ? "border-brand bg-brand/5" : "border-ink/15"}`}
-              >
-                <input
-                  type="radio"
-                  name="vehicle"
-                  className="mt-0.5 accent-[var(--brand)]"
-                  required
-                  disabled={!a.available}
-                  checked={form.vehicleId === a.vehicle.id}
-                  onChange={() => set({ vehicleId: a.vehicle.id, dailyRate: "", depositAmount: "" })}
-                />
-                <span>
-                  <strong className="text-ink">
-                    {a.vehicle.make} {a.vehicle.model}
-                  </strong>
-                  <br />
-                  {a.vehicle.plateNumber} · {format.money(a.dailyRate)}
-                  <br />
-                  <span className={a.available ? "text-emerald-700" : "text-rose-700"}>{a.reason ?? "Available for these dates"}</span>
-                </span>
-              </label>
-            ))}
-          </div>
-          {issue("vehicleId") && <p className="mt-1 text-xs font-semibold text-rose-700">{issue("vehicleId")}</p>}
-        </fieldset>
+        {mode === "both" && (
+          <fieldset className="flex flex-wrap gap-4">
+            <legend className="mb-1 text-xs font-semibold tracking-normal text-muted">How to reserve</legend>
+            <label className="flex items-center gap-2 text-sm">
+              <input type="radio" name="pickStyle" className="accent-[var(--brand)]" checked={pickStyle === "vehicle"} onChange={() => switchStyle("vehicle")} />
+              Specific registration
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input type="radio" name="pickStyle" className="accent-[var(--brand)]" checked={pickStyle === "class"} onChange={() => switchStyle("class")} />
+              Make &amp; model (assign plate later)
+            </label>
+          </fieldset>
+        )}
 
-        {(f("dailyRate").on || f("depositAmount").on) && (
+        {showVehiclePicker && (
+          <fieldset>
+            <legend className="mb-2 text-xs font-semibold tracking-normal text-muted">
+              {f("vehicle").label}
+              {canSeeBookingPricing ? " · rate per day" : ""}
+            </legend>
+            {f("vehicle").help && <p className="mb-2 text-xs text-muted">{f("vehicle").help}</p>}
+            {days < 1 && <p className="text-rose-700">The return date must be after the pickup date.</p>}
+            {availability.isFetching && <Loading label="Checking availability" />}
+            <ErrorNote error={availability.error} />
+            <div className="grid gap-2 sm:grid-cols-2">
+              {availability.data?.vehicles.map((a) => (
+                <label
+                  key={a.vehicle.id}
+                  className={`flex items-start gap-3 border p-3 ${!a.available ? "bg-paper opacity-50" : form.vehicleId === a.vehicle.id ? "border-brand bg-brand/5" : "border-ink/15"}`}
+                >
+                  <input
+                    type="radio"
+                    name="vehicle"
+                    className="mt-0.5 accent-[var(--brand)]"
+                    required={showVehiclePicker}
+                    disabled={!a.available}
+                    checked={form.vehicleId === a.vehicle.id}
+                    onChange={() => set({ vehicleId: a.vehicle.id, dailyRate: "", depositAmount: "", supplierRentalCost: "" })}
+                  />
+                  <span>
+                    <strong className="text-ink">
+                      {a.vehicle.make} {a.vehicle.model}
+                    </strong>
+                    <br />
+                    {a.vehicle.plateNumber}
+                    {canSeeBookingPricing && a.dailyRate != null ? ` · ${format.money(a.dailyRate)}` : ""}
+                    {config.modules.vehicles.thirdPartyVehicles && a.ownership === "THIRD_PARTY" ? " · Third-party" : ""}
+                    <br />
+                    <span className={a.available ? "text-emerald-700" : "text-rose-700"}>{a.reason ?? "Available for these dates"}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+            {issue("vehicleId") && <p className="mt-1 text-xs font-semibold text-rose-700">{issue("vehicleId")}</p>}
+          </fieldset>
+        )}
+
+        {showClassPicker && (
+          <fieldset>
+            <legend className="mb-2 text-xs font-semibold tracking-normal text-muted">
+              Vehicle make &amp; model
+              {canSeeBookingPricing ? " · rate per day" : ""}
+            </legend>
+            <p className="mb-2 text-xs text-muted">Reserve capacity without picking a registration. Assign a plate before handover.</p>
+            {days < 1 && <p className="text-rose-700">The return date must be after the pickup date.</p>}
+            {availability.isFetching && <Loading label="Checking availability" />}
+            <ErrorNote error={availability.error} />
+            <div className="grid gap-2 sm:grid-cols-2">
+              {availability.data?.classes.map((c) => {
+                const selected = form.requestedMake === c.make && form.requestedModel === c.model;
+                return (
+                  <label
+                    key={`${c.make}|${c.model}`}
+                    className={`flex items-start gap-3 border p-3 ${!c.available ? "bg-paper opacity-50" : selected ? "border-brand bg-brand/5" : "border-ink/15"}`}
+                  >
+                    <input
+                      type="radio"
+                      name="vehicleClass"
+                      className="mt-0.5 accent-[var(--brand)]"
+                      required={showClassPicker}
+                      disabled={!c.available}
+                      checked={selected}
+                      onChange={() => set({ requestedMake: c.make, requestedModel: c.model, dailyRate: "", depositAmount: "" })}
+                    />
+                    <span>
+                      <strong className="text-ink">
+                        {c.make} {c.model}
+                      </strong>
+                      <br />
+                      {c.availableCount} of {c.fleetCount} free
+                      {canSeeBookingPricing && c.dailyRate != null ? ` · from ${format.money(c.dailyRate)}` : ""}
+                      <br />
+                      <span className={c.available ? "text-emerald-700" : "text-rose-700"}>{c.reason ?? "Available for these dates"}</span>
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+            {(issue("requestedMake") || issue("requestedModel")) && (
+              <p className="mt-1 text-xs font-semibold text-rose-700">{issue("requestedMake") ?? issue("requestedModel")}</p>
+            )}
+          </fieldset>
+        )}
+
+        {canSeeBookingPricing && (f("dailyRate").on || f("depositAmount").on || showSupplierCost) && (
           <div className="grid gap-3 sm:grid-cols-2">
             {f("dailyRate").on && (
               <Field label={`${f("dailyRate").label} (${config.locale.currency})`} hint={f("dailyRate").help ?? "Defaults to the vehicle's rate"} error={issue("dailyRate")}>
@@ -205,6 +316,25 @@ export function BookingDialog({ defaults, onClose, onBooked }: { defaults: Booki
                     placeholder={chosen ? String(chosen.depositAmount) : ""}
                     value={form.depositAmount}
                     onChange={(e) => set({ depositAmount: e.target.value })}
+                  />
+                )}
+              </Field>
+            )}
+            {showSupplierCost && (
+              <Field
+                label={`Supplier rental cost (${config.locale.currency})`}
+                hint="Amount payable to the third-party vehicle supplier for this booking."
+                error={issue("supplierRentalCost")}
+              >
+                {(id) => (
+                  <Input
+                    id={id}
+                    type="number"
+                    required
+                    min="0"
+                    step="any"
+                    value={form.supplierRentalCost}
+                    onChange={(e) => set({ supplierRentalCost: e.target.value })}
                   />
                 )}
               </Field>
@@ -284,7 +414,9 @@ export function BookingDialog({ defaults, onClose, onBooked }: { defaults: Booki
                   label={
                     <>
                       <span className="font-semibold">Full amount paid</span>
-                      {canAdvance ? `: collect ${format.money(fullAmount)} now (the rental and the deposit)` : ": the renter has paid everything for this rental"}
+                      {canAdvance && canSeeBookingPricing
+                        ? `: collect ${format.money(fullAmount)} now (the rental and the deposit)`
+                        : ": the renter has paid everything for this rental"}
                     </>
                   }
                   checked={fullyPaid}
@@ -301,10 +433,26 @@ export function BookingDialog({ defaults, onClose, onBooked }: { defaults: Booki
         )}
 
         <div className="space-y-1 border border-line bg-paper p-3 text-sm">
-          <p>
-            {Math.max(days, 0)} days × {format.money(rate)} = <strong>{format.money(Math.max(days, 0) * rate)}</strong>
-          </p>
-          <p className="text-muted">Refundable security deposit: {format.money(deposit)}</p>
+          {canSeeBookingPricing ? (
+            <>
+              <p>
+                {Math.max(days, 0)} days × {format.money(rate)} = <strong>{format.money(customerRevenue)}</strong>
+              </p>
+              <p className="text-muted">Refundable security deposit: {format.money(deposit)}</p>
+              {showSupplierCost && (
+                <>
+                  <p className="text-muted">Third-party supplier rental cost: {format.money(supplierCost)}</p>
+                  <p>
+                    Gross profit before other expenses: <strong>{format.money(grossProfit)}</strong>
+                  </p>
+                </>
+              )}
+            </>
+          ) : (
+            <p>
+              {Math.max(days, 0)} day{Math.max(days, 0) === 1 ? "" : "s"} · rates applied from the vehicle
+            </p>
+          )}
         </div>
 
         <ErrorNote error={book.error} />
@@ -312,7 +460,7 @@ export function BookingDialog({ defaults, onClose, onBooked }: { defaults: Booki
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button type="submit" variant="primary" disabled={book.isPending || uploading || days < 1 || !chosen?.available}>
+          <Button type="submit" variant="primary" disabled={book.isPending || uploading || days < 1 || !selectionReady}>
             {handOver && canHandOver ? "Book and hand over" : "Confirm booking"}
           </Button>
         </div>

@@ -270,7 +270,7 @@ function RenterDetails({ renter }: { renter: RenterDossier }) {
               {renter.rentals.map((r) => (
                 <li key={r.id} className="flex items-center justify-between gap-2 p-2">
                   <span>
-                    <strong>{r.code}</strong> · {r.vehicle.plateNumber} · {format.day(r.startDate)} → {format.day(r.endDate)}
+                    <strong>{r.code}</strong> · {r.vehicle?.plateNumber ?? (`${r.requestedMake ?? ""} ${r.requestedModel ?? ""}`.trim() || "Unassigned")} · {format.day(r.startDate)} → {format.day(r.endDate)}
                   </span>
                   <RentalStatusBadge rental={r} />
                 </li>

@@ -14,16 +14,22 @@ import { Checkbox, Field, Input, Textarea, numberOrUndefined } from "@/component
 import { Badge, ErrorNote, Loading, table } from "@/components/ui/page";
 import { useApiDownload } from "@/lib/api";
 import type { Inspection, RentalDetail } from "@/lib/contract";
-import { useRental, useTenantMutation } from "@/lib/queries";
+import { useAvailability, useRental, useTenantMutation } from "@/lib/queries";
 import { useWorkspace } from "@/lib/workspace";
 
-type Panel = "checkin" | "return" | "payment" | "details" | null;
+type Panel = "checkin" | "return" | "payment" | "details" | "assign" | null;
+
+function vehicleLabel(rental: { vehicle: { plateNumber: string; make: string; model: string } | null; requestedMake: string | null; requestedModel: string | null }) {
+  if (rental.vehicle) return `${rental.vehicle.plateNumber} · ${rental.vehicle.make} ${rental.vehicle.model}`;
+  if (rental.requestedMake && rental.requestedModel) return `${rental.requestedMake} ${rental.requestedModel} (unassigned)`;
+  return "No vehicle";
+}
 
 /** A rental's details, inspections and payments, with the actions the member may take for its status. */
 export function RentalDialog({ rentalId, onClose }: { rentalId: string; onClose: () => void }) {
   const { data: rental, error, isPending } = useRental(rentalId);
   return (
-    <Dialog open onClose={onClose} title={rental ? `${rental.code} · ${rental.vehicle.plateNumber}` : "Rental"} eyebrow="Rental details" width="lg">
+    <Dialog open onClose={onClose} title={rental ? `${rental.code} · ${vehicleLabel(rental)}` : "Rental"} eyebrow="Rental details" width="lg">
       {isPending && <Loading />}
       <ErrorNote error={error} />
       {rental && <RentalDetails rental={rental} onClose={onClose} />}
@@ -32,7 +38,7 @@ export function RentalDialog({ rentalId, onClose }: { rentalId: string; onClose:
 }
 
 function RentalDetails({ rental, onClose }: { rental: RentalDetail; onClose: () => void }) {
-  const { config, can, moduleOn, format, label } = useWorkspace();
+  const { config, can, canSeeBookingPricing, moduleOn, format, label } = useWorkspace();
   const { builtIn: f, custom: customFields } = useFields("rentals");
   const [panel, setPanel] = useState<Panel>(null);
   const cancel = useTenantMutation((request) => request<RentalDetail>("POST", `/rentals/${rental.id}/cancel`));
@@ -43,7 +49,8 @@ function RentalDetails({ rental, onClose }: { rental: RentalDetail; onClose: () 
     !rental.fullPayment &&
     (rental.status === "ACTIVE" || rental.status === "COMPLETED") &&
     (can("rentals:checkin") || can("payments:record")) &&
-    (!moduleOn("payments") || rental.balance <= 0);
+    // When outstanding is hidden, still offer confirm; the API enforces what's owed.
+    (!moduleOn("payments") || rental.balance == null || rental.balance <= 0);
   const toggle = (next: Panel) => setPanel((current) => (current === next ? null : next));
 
   return (
@@ -64,19 +71,28 @@ function RentalDetails({ rental, onClose }: { rental: RentalDetail; onClose: () 
           {rental.renter.fullName} ({rental.renter.profileId}) · {rental.renter.phone}
         </Item>
         <Item label={f("vehicle").label}>
-          {rental.vehicle.plateNumber} · {rental.vehicle.make} {rental.vehicle.model}
+          {vehicleLabel(rental)}
+          {rental.needsVehicleAssignment && <span className="ml-2 text-xs font-semibold text-amber-700">Assign before handover</span>}
         </Item>
         <Item label="Dates">
           {format.day(rental.startDate)} → {format.day(rental.endDate)} ({rental.totalDays} days)
         </Item>
-        {/* The rate and deposit are part of what's owed, so they show even when their booking fields are off. */}
-        <Item label={f("dailyRate").label}>{format.money(rental.dailyRate)} / day</Item>
-        <Item label="Rental total">{format.money(rental.totalAmount)}</Item>
-        <Item label={f("depositAmount").label}>{format.money(rental.depositAmount)}</Item>
+        {/* Rate/total/deposit show when the caller may see booking pricing (even if those booking fields are off in config). */}
+        {canSeeBookingPricing && rental.dailyRate != null && <Item label={f("dailyRate").label}>{format.money(rental.dailyRate)} / day</Item>}
+        {canSeeBookingPricing && rental.totalAmount != null && <Item label="Rental total">{format.money(rental.totalAmount)}</Item>}
+        {canSeeBookingPricing && rental.supplierRentalCost != null && rental.totalAmount != null && (
+          <>
+            <Item label="Supplier rental cost">{format.money(rental.supplierRentalCost)}</Item>
+            <Item label="Gross profit before other expenses">{format.money(rental.totalAmount - rental.supplierRentalCost)}</Item>
+          </>
+        )}
+        {canSeeBookingPricing && rental.depositAmount != null && <Item label={f("depositAmount").label}>{format.money(rental.depositAmount)}</Item>}
         <Item label="Paid">{format.money(rental.paidAmount)}</Item>
-        <Item label="Outstanding">
-          <span className={rental.balance > 0 ? "font-semibold text-rose-700" : "text-emerald-700"}>{format.money(rental.balance)}</span>
-        </Item>
+        {canSeeBookingPricing && rental.balance != null && (
+          <Item label="Outstanding">
+            <span className={rental.balance > 0 ? "font-semibold text-rose-700" : "text-emerald-700"}>{format.money(rental.balance)}</span>
+          </Item>
+        )}
         {rental.fullPayment && (
           <Item label="Full payment">
             <span className="text-emerald-700">
@@ -96,7 +112,12 @@ function RentalDetails({ rental, onClose }: { rental: RentalDetail; onClose: () 
       </div>
 
       <div className="flex flex-wrap gap-2">
-        {rental.status === "RESERVED" && can("rentals:checkin") && (
+        {rental.status === "RESERVED" && can("rentals:create") && (
+          <Button variant={rental.needsVehicleAssignment ? "primary" : "outline"} onClick={() => toggle("assign")}>
+            {rental.needsVehicleAssignment ? "Assign vehicle" : "Change vehicle"}
+          </Button>
+        )}
+        {rental.status === "RESERVED" && can("rentals:checkin") && !rental.needsVehicleAssignment && (
           <Button variant="primary" onClick={() => toggle("checkin")}>
             Check in &amp; hand over
           </Button>
@@ -145,6 +166,7 @@ function RentalDetails({ rental, onClose }: { rental: RentalDetail; onClose: () 
       <ErrorNote error={cancel.error} />
       <ErrorNote error={confirmPaid.error} />
 
+      {panel === "assign" && <AssignVehicleForm rental={rental} onDone={() => setPanel(null)} />}
       {panel === "checkin" && <HandoverForm rental={rental} kind="checkin" onDone={() => setPanel(null)} />}
       {panel === "return" && <HandoverForm rental={rental} kind="return" onDone={() => setPanel(null)} />}
       {panel === "details" && (
@@ -194,6 +216,123 @@ function RentalDetails({ rental, onClose }: { rental: RentalDetail; onClose: () 
       <div className="flex justify-end border-t border-line pt-4">
         <Button variant="outline" onClick={onClose}>
           Close
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/** Assigns (or reassigns) a registration plate to a RESERVED booking. */
+function AssignVehicleForm({ rental, onDone }: { rental: RentalDetail; onDone: () => void }) {
+  const { format, config, canSeeBookingPricing } = useWorkspace();
+  const [vehicleId, setVehicleId] = useState(rental.vehicle?.id ?? "");
+  const [supplierRentalCost, setSupplierRentalCost] = useState(
+    rental.supplierRentalCost != null ? String(rental.supplierRentalCost) : "",
+  );
+  const availability = useAvailability(rental.startDate, rental.endDate, rental.id);
+  const assign = useTenantMutation((request, body: unknown) =>
+    request<RentalDetail>("POST", `/rentals/${rental.id}/assign-vehicle`, body),
+  );
+
+  const matchesClass = (make: string, model: string) =>
+    !rental.requestedMake ||
+    !rental.requestedModel ||
+    (make.toLowerCase() === rental.requestedMake.toLowerCase() && model.toLowerCase() === rental.requestedModel.toLowerCase());
+
+  const options = (availability.data?.vehicles ?? []).filter((a) => matchesClass(a.vehicle.make, a.vehicle.model));
+  const chosen = options.find((a) => a.vehicle.id === vehicleId);
+  const showSupplierCost =
+    canSeeBookingPricing && Boolean(config.modules.vehicles.thirdPartyVehicles) && chosen?.ownership === "THIRD_PARTY";
+
+  return (
+    <div className="space-y-3 border border-brand/30 bg-brand/5 p-4">
+      <h4 className="font-semibold tracking-normal text-ink">
+        {rental.needsVehicleAssignment ? "Assign a vehicle" : "Change vehicle"}
+      </h4>
+      {rental.requestedMake && rental.requestedModel && (
+        <p className="text-sm text-muted">
+          This reservation is for a <strong className="text-ink">{rental.requestedMake} {rental.requestedModel}</strong>.
+        </p>
+      )}
+      {availability.isFetching && <Loading label="Checking availability" />}
+      <ErrorNote error={availability.error} />
+      <div className="grid gap-2 sm:grid-cols-2">
+        {options.map((a) => (
+          <label
+            key={a.vehicle.id}
+            className={`flex items-start gap-3 border bg-panel p-3 ${!a.available ? "opacity-50" : vehicleId === a.vehicle.id ? "border-brand" : "border-ink/15"}`}
+          >
+            <input
+              type="radio"
+              name="assignVehicle"
+              className="mt-0.5 accent-[var(--brand)]"
+              disabled={!a.available && a.vehicle.id !== rental.vehicle?.id}
+              checked={vehicleId === a.vehicle.id}
+              onChange={() => {
+                setVehicleId(a.vehicle.id);
+                setSupplierRentalCost("");
+              }}
+            />
+            <span className="text-sm">
+              <strong className="text-ink">
+                {a.vehicle.make} {a.vehicle.model}
+              </strong>
+              <br />
+              {a.vehicle.plateNumber}
+              {canSeeBookingPricing && a.dailyRate != null ? ` · ${format.money(a.dailyRate)}` : ""}
+              {config.modules.vehicles.thirdPartyVehicles && a.ownership === "THIRD_PARTY" ? " · Third-party" : ""}
+              <br />
+              <span className={a.available || a.vehicle.id === rental.vehicle?.id ? "text-emerald-700" : "text-rose-700"}>
+                {a.vehicle.id === rental.vehicle?.id ? "Currently assigned" : (a.reason ?? "Available")}
+              </span>
+            </span>
+          </label>
+        ))}
+      </div>
+      {showSupplierCost && (
+        <Field
+          label={`Supplier rental cost (${config.locale.currency})`}
+          hint="Amount payable to the third-party vehicle supplier for this booking."
+          error={assign.error?.issueFor("supplierRentalCost")}
+        >
+          {(id) => (
+            <Input
+              id={id}
+              type="number"
+              required
+              min="0"
+              step="any"
+              value={supplierRentalCost}
+              onChange={(e) => setSupplierRentalCost(e.target.value)}
+            />
+          )}
+        </Field>
+      )}
+      {options.length === 0 && !availability.isFetching && <p className="text-sm text-muted">No matching vehicles for these dates.</p>}
+      <ErrorNote error={assign.error} />
+      <div className="flex justify-end gap-2">
+        <Button variant="outline" onClick={onDone}>
+          Cancel
+        </Button>
+        <Button
+          variant="primary"
+          disabled={!vehicleId || assign.isPending || (vehicleId === rental.vehicle?.id && !showSupplierCost)}
+          onClick={() =>
+            assign.mutate(
+              {
+                vehicleId,
+                ...(showSupplierCost ? { supplierRentalCost: numberOrUndefined(supplierRentalCost) ?? 0 } : {}),
+              },
+              {
+                onSuccess: (updated) => {
+                  toast.success(`${updated.vehicle?.plateNumber ?? "Vehicle"} assigned to ${updated.code}`);
+                  onDone();
+                },
+              },
+            )
+          }
+        >
+          Save assignment
         </Button>
       </div>
     </div>
@@ -307,41 +446,56 @@ function PaymentAtPickup({
   onConfirmedChange: (confirmed: boolean) => void;
   error?: string;
 }) {
-  const { format, moduleOn, can } = useWorkspace();
+  const { format, moduleOn, can, canSeeBookingPricing } = useWorkspace();
   const [collecting, setCollecting] = useState(false);
   const ledger = moduleOn("payments");
   const owed = rental.balance;
-  const blocked = ledger && owed > 0;
+  const showOwed = canSeeBookingPricing && owed != null;
+  const blocked = ledger && showOwed && owed > 0;
 
   return (
     <div className="space-y-2 border-t border-brand/20 pt-3">
       <p className="font-semibold tracking-normal text-ink">Payment</p>
       {ledger &&
-        (owed > 0 ? (
-          <p className="text-xs text-ink">
-            <span className="font-semibold text-rose-700">{format.money(owed)}</span> is still to be paid: the rental and deposit, less {format.money(rental.paidAmount)}{" "}
-            paid.{" "}
-            {can("payments:record") ? (
-              <button type="button" className="font-semibold text-brand underline" onClick={() => setCollecting((open) => !open)}>
-                {collecting ? "Not now" : "Record it now"}
-              </button>
-            ) : (
-              "Someone who records payments needs to take it first."
-            )}
-          </p>
+        (showOwed ? (
+          owed > 0 ? (
+            <p className="text-xs text-ink">
+              <span className="font-semibold text-rose-700">{format.money(owed)}</span> is still to be paid: the rental and deposit, less {format.money(rental.paidAmount)}{" "}
+              paid.{" "}
+              {can("payments:record") ? (
+                <button type="button" className="font-semibold text-brand underline" onClick={() => setCollecting((open) => !open)}>
+                  {collecting ? "Not now" : "Record it now"}
+                </button>
+              ) : (
+                "Someone who records payments needs to take it first."
+              )}
+            </p>
+          ) : (
+            <p className="text-xs text-emerald-700">Nothing is owed: {format.money(rental.paidAmount)} paid.</p>
+          )
         ) : (
-          <p className="text-xs text-emerald-700">Nothing is owed: {format.money(rental.paidAmount)} paid.</p>
+          <p className="text-xs text-muted">
+            {format.money(rental.paidAmount)} paid so far.
+            {can("payments:record") ? (
+              <>
+                {" "}
+                <button type="button" className="font-semibold text-brand underline" onClick={() => setCollecting((open) => !open)}>
+                  {collecting ? "Not now" : "Record a payment"}
+                </button>
+              </>
+            ) : null}
+          </p>
         ))}
-      {collecting && blocked && (
+      {collecting && (blocked || (!showOwed && can("payments:record"))) && (
         <div className="border border-line bg-panel p-3">
           <PaymentForm
             rental={rental}
             types={["RENTAL", "DEPOSIT"]}
-            defaultAmount={owed}
+            defaultAmount={showOwed ? owed : undefined}
             onDone={(payment) => {
               setCollecting(false);
               // Paying off what was owed is the usual reason to record it here.
-              if (payment.amount >= owed) onConfirmedChange(true);
+              if (showOwed && payment.amount >= owed!) onConfirmedChange(true);
             }}
           />
         </div>
