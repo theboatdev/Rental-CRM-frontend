@@ -9,7 +9,11 @@ const toUtc = (date: string) => new Date(`${date}T00:00:00Z`);
 
 export const addDays = (date: string, days: number) => new Date(toUtc(date).getTime() + days * DAY_MS).toISOString().slice(0, 10);
 
+/** Exclusive day difference (end − start). Useful for “days until”. */
 export const daysBetween = (start: string, end: string) => Math.round((toUtc(end).getTime() - toUtc(start).getTime()) / DAY_MS);
+
+/** Inclusive rental length: pickup and return days both count (25→29 = 5). */
+export const rentalDays = (start: string, end: string) => daysBetween(start, end) + 1;
 
 /** The YYYY-MM month `offset` months from `month`. */
 export function shiftMonth(month: string, offset: number) {

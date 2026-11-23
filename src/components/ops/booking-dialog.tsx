@@ -10,7 +10,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { Checkbox, Field, Input, Select, Textarea, numberOrUndefined } from "@/components/ui/field";
 import { ErrorNote, Loading } from "@/components/ui/page";
 import type { RentalDetail, ReservationMode } from "@/lib/contract";
-import { addDays, daysBetween } from "@/lib/dates";
+import { addDays, rentalDays } from "@/lib/dates";
 import { useAvailability, useRenters, useTenantMutation } from "@/lib/queries";
 import { useWorkspace } from "@/lib/workspace";
 
@@ -44,7 +44,7 @@ export function BookingDialog({ defaults, onClose, onBooked }: { defaults: Booki
     requestedMake: "",
     requestedModel: "",
     startDate: start,
-    endDate: addDays(start, Math.max(3, config.rules.minRentalDays)),
+    endDate: addDays(start, Math.max(3, config.rules.minRentalDays) - 1),
     dailyRate: "",
     depositAmount: "",
     supplierRentalCost: "",
@@ -67,7 +67,7 @@ export function BookingDialog({ defaults, onClose, onBooked }: { defaults: Booki
   const book = useTenantMutation((request, body: unknown) => request<RentalDetail>("POST", "/rentals", body));
 
   const set = (patch: Partial<typeof form>) => setForm((current) => ({ ...current, ...patch }));
-  const days = form.startDate && form.endDate ? daysBetween(form.startDate, form.endDate) : 0;
+  const days = form.startDate && form.endDate ? rentalDays(form.startDate, form.endDate) : 0;
   const showVehiclePicker = mode === "specificVehicle" || (mode === "both" && pickStyle === "vehicle");
   const showClassPicker = mode === "vehicleClass" || (mode === "both" && pickStyle === "class");
   const chosenVehicle = availability.data?.vehicles.find((a) => a.vehicle.id === form.vehicleId);
@@ -178,7 +178,7 @@ export function BookingDialog({ defaults, onClose, onBooked }: { defaults: Booki
             {(id) => <Input id={id} type="date" required min={today()} value={form.startDate} onChange={(e) => set({ startDate: e.target.value })} />}
           </Field>
           <Field label={f("endDate").label} hint={f("endDate").help} error={issue("endDate")}>
-            {(id) => <Input id={id} type="date" required min={form.startDate ? addDays(form.startDate, 1) : undefined} value={form.endDate} onChange={(e) => set({ endDate: e.target.value })} />}
+            {(id) => <Input id={id} type="date" required min={form.startDate || undefined} value={form.endDate} onChange={(e) => set({ endDate: e.target.value })} />}
           </Field>
         </div>
 

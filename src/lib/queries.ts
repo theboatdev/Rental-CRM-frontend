@@ -62,7 +62,7 @@ export const useVehicle = (id: string | null) => useTenantQuery<VehicleDossier>(
 export const useAvailability = (startDate: string, endDate: string, excludeRentalId?: string) =>
   useTenantQuery<AvailabilityResponse>(
     ["availability", startDate, endDate, excludeRentalId],
-    startDate && endDate && startDate < endDate ? `/vehicles/availability${query({ startDate, endDate, excludeRentalId })}` : null,
+    startDate && endDate && startDate <= endDate ? `/vehicles/availability${query({ startDate, endDate, excludeRentalId })}` : null,
   );
 export const useRenters = () => useTenantQuery<Renter[]>(["renters"], "/renters");
 export const useRenter = (id: string | null) => useTenantQuery<RenterDossier>(["renters", id], id && `/renters/${id}`);
