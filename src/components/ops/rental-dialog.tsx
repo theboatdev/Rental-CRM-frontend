@@ -3,18 +3,25 @@
 import { BadgeCheck, FileDown, Loader2 } from "lucide-react";
 import { useId, useState, type ReactNode } from "react";
 import { toast } from "sonner";
-import { CustomFieldList, CustomFieldsEditor, useFields } from "@/components/ops/fields";
+import {
+  CustomFieldInputs,
+  CustomFieldList,
+  customFieldsPayload,
+  draftOf,
+  useFields,
+} from "@/components/ops/fields";
 import { PhotoThumb, useUploadsInFlight } from "@/components/ops/files";
 import { InspectionChecklist, photosPayload, type InspectionPhotos } from "@/components/ops/inspection-checklist";
 import { PaymentForm } from "@/components/ops/payment-form";
 import { PAYMENT_TYPE_LABELS, RentalStatusBadge } from "@/components/ops/status";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
-import { Checkbox, Field, Input, Textarea, numberOrUndefined } from "@/components/ui/field";
+import { Checkbox, Field, Input, Select, Textarea, numberOrUndefined } from "@/components/ui/field";
 import { Badge, ErrorNote, Loading, table } from "@/components/ui/page";
 import { useApiDownload } from "@/lib/api";
 import type { Inspection, RentalDetail } from "@/lib/contract";
-import { useAvailability, useRental, useTenantMutation } from "@/lib/queries";
+import { rentalDays } from "@/lib/dates";
+import { useAvailability, useRental, useRenters, useTenantMutation } from "@/lib/queries";
 import { useWorkspace } from "@/lib/workspace";
 
 type Panel = "checkin" | "return" | "payment" | "details" | "assign" | null;
@@ -39,7 +46,7 @@ export function RentalDialog({ rentalId, onClose }: { rentalId: string; onClose:
 
 function RentalDetails({ rental, onClose }: { rental: RentalDetail; onClose: () => void }) {
   const { config, can, canSeeBookingPricing, moduleOn, format, label } = useWorkspace();
-  const { builtIn: f, custom: customFields } = useFields("rentals");
+  const { builtIn: f } = useFields("rentals");
   const [panel, setPanel] = useState<Panel>(null);
   const cancel = useTenantMutation((request) => request<RentalDetail>("POST", `/rentals/${rental.id}/cancel`));
   const confirmPaid = useTenantMutation((request) => request<RentalDetail>("POST", `/rentals/${rental.id}/full-payment`));
@@ -144,7 +151,7 @@ function RentalDetails({ rental, onClose }: { rental: RentalDetail; onClose: () 
             <BadgeCheck size={14} /> Confirm full payment
           </Button>
         )}
-        {can("rentals:create") && (f("notes").on || customFields.length > 0) && (
+        {can("rentals:create") && (rental.status === "RESERVED" || rental.status === "ACTIVE") && (
           <Button variant="outline" onClick={() => toggle("details")}>
             Edit details
           </Button>
@@ -171,7 +178,7 @@ function RentalDetails({ rental, onClose }: { rental: RentalDetail; onClose: () 
       {panel === "return" && <HandoverForm rental={rental} kind="return" onDone={() => setPanel(null)} />}
       {panel === "details" && (
         <div className="border border-brand/30 bg-brand/5 p-4">
-          <CustomFieldsEditor section="rentals" url={`/rentals/${rental.id}`} values={rental.customFields} notes={rental.notes} onDone={() => setPanel(null)} />
+          <EditRentalForm rental={rental} onDone={() => setPanel(null)} />
         </div>
       )}
       {panel === "payment" && (
@@ -219,6 +226,191 @@ function RentalDetails({ rental, onClose }: { rental: RentalDetail; onClose: () 
         </Button>
       </div>
     </div>
+  );
+}
+
+/**
+ * Edits a rental by status: RESERVED can change dates, renter, rate and deposit;
+ * ACTIVE can change rate, notes and custom fields. Vehicle changes stay on Assign.
+ */
+function EditRentalForm({ rental, onDone }: { rental: RentalDetail; onDone: () => void }) {
+  const { config, canSeeBookingPricing, format, today } = useWorkspace();
+  const { builtIn: f, custom: customFields } = useFields("rentals");
+  const reserved = rental.status === "RESERVED";
+  const renters = useRenters();
+  const [form, setForm] = useState({
+    startDate: rental.startDate,
+    endDate: rental.endDate,
+    renterId: rental.renter.id,
+    dailyRate: rental.dailyRate != null ? String(rental.dailyRate) : "",
+    depositAmount: rental.depositAmount != null ? String(rental.depositAmount) : "",
+    notes: rental.notes ?? "",
+  });
+  const [initialCustom] = useState(() => draftOf(customFields, rental.customFields));
+  const [custom, setCustom] = useState(initialCustom);
+  const { uploading, onBusy } = useUploadsInFlight();
+  const availability = useAvailability(form.startDate, form.endDate, rental.id);
+  const save = useTenantMutation((request, body: unknown) => request<RentalDetail>("PATCH", `/rentals/${rental.id}`, body));
+  const set = (patch: Partial<typeof form>) => setForm((current) => ({ ...current, ...patch }));
+  const issue = (path: string) => save.error?.issueFor(path);
+
+  const days = form.startDate && form.endDate ? rentalDays(form.startDate, form.endDate) : 0;
+  const rate = numberOrUndefined(form.dailyRate) ?? rental.dailyRate ?? 0;
+  const previewTotal = Math.max(days, 0) * rate;
+  const chosenBusy =
+    reserved &&
+    rental.vehicle &&
+    availability.data?.vehicles.find((a) => a.vehicle.id === rental.vehicle!.id && !a.available);
+
+  return (
+    <form
+      className="space-y-3"
+      onSubmit={(event) => {
+        event.preventDefault();
+        const body: Record<string, unknown> = {};
+        if (reserved) {
+          if (form.startDate !== rental.startDate) body.startDate = form.startDate;
+          if (form.endDate !== rental.endDate) body.endDate = form.endDate;
+          if (form.renterId !== rental.renter.id) body.renterId = form.renterId;
+          if (canSeeBookingPricing && f("depositAmount").on) {
+            const deposit = numberOrUndefined(form.depositAmount);
+            if (deposit !== undefined && deposit !== rental.depositAmount) body.depositAmount = deposit;
+          }
+        }
+        if (canSeeBookingPricing && f("dailyRate").on) {
+          const dailyRate = numberOrUndefined(form.dailyRate);
+          if (dailyRate !== undefined && dailyRate !== rental.dailyRate) body.dailyRate = dailyRate;
+        }
+        if (f("notes").on && form.notes !== (rental.notes ?? "")) body.notes = form.notes;
+        const customPayload = customFieldsPayload(customFields, custom, initialCustom);
+        if (Object.keys(customPayload).length) body.customFields = customPayload;
+        if (Object.keys(body).length === 0) {
+          onDone();
+          return;
+        }
+        save.mutate(body, {
+          onSuccess: (updated) => {
+            toast.success(`${updated.code} updated`);
+            onDone();
+          },
+        });
+      }}
+    >
+      <h4 className="font-semibold tracking-normal text-ink">Edit details</h4>
+      {reserved && (
+        <>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label={f("startDate").label} hint={f("startDate").help} error={issue("startDate")}>
+              {(id) => (
+                <Input id={id} type="date" required min={today()} value={form.startDate} onChange={(e) => set({ startDate: e.target.value })} />
+              )}
+            </Field>
+            <Field label={f("endDate").label} hint={f("endDate").help} error={issue("endDate")}>
+              {(id) => (
+                <Input
+                  id={id}
+                  type="date"
+                  required
+                  min={form.startDate || undefined}
+                  value={form.endDate}
+                  onChange={(e) => set({ endDate: e.target.value })}
+                />
+              )}
+            </Field>
+          </div>
+          {days < 1 && <p className="text-sm text-rose-700">The return date must be on or after the pickup date.</p>}
+          {availability.isFetching && <Loading label="Checking availability" />}
+          {chosenBusy && (
+            <p className="text-sm text-rose-700">
+              {rental.vehicle!.plateNumber} is not free for these dates
+              {chosenBusy.reason ? `: ${chosenBusy.reason}` : ""}.
+            </p>
+          )}
+          <Field label={f("renter").label} hint={f("renter").help} error={issue("renterId")}>
+            {(id) =>
+              renters.isPending ? (
+                <Loading label="Loading renters" />
+              ) : (
+                <Select id={id} required value={form.renterId} onChange={(e) => set({ renterId: e.target.value })}>
+                  {renters.data?.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.profileId} — {r.fullName} ({r.phone})
+                    </option>
+                  ))}
+                </Select>
+              )
+            }
+          </Field>
+        </>
+      )}
+
+      {canSeeBookingPricing && (f("dailyRate").on || (reserved && f("depositAmount").on)) && (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {f("dailyRate").on && (
+            <Field
+              label={`${f("dailyRate").label} (${config.locale.currency})`}
+              hint={f("dailyRate").help}
+              error={issue("dailyRate")}
+            >
+              {(id) => (
+                <Input
+                  id={id}
+                  type="number"
+                  required={f("dailyRate").required}
+                  min="1"
+                  step="any"
+                  value={form.dailyRate}
+                  onChange={(e) => set({ dailyRate: e.target.value })}
+                />
+              )}
+            </Field>
+          )}
+          {reserved && f("depositAmount").on && (
+            <Field
+              label={`${f("depositAmount").label} (${config.locale.currency})`}
+              hint={f("depositAmount").help}
+              error={issue("depositAmount")}
+            >
+              {(id) => (
+                <Input
+                  id={id}
+                  type="number"
+                  required={f("depositAmount").required}
+                  min="0"
+                  step="any"
+                  value={form.depositAmount}
+                  onChange={(e) => set({ depositAmount: e.target.value })}
+                />
+              )}
+            </Field>
+          )}
+        </div>
+      )}
+
+      {canSeeBookingPricing && f("dailyRate").on && days > 0 && (
+        <p className="text-sm text-muted">
+          {days} {days === 1 ? "day" : "days"} × {format.money(rate)} = <strong className="text-ink">{format.money(previewTotal)}</strong>
+          {rental.paidAmount > 0 ? ` · paid ${format.money(rental.paidAmount)}` : ""}
+        </p>
+      )}
+
+      {f("notes").on && (
+        <Field label={f("notes").label} hint={f("notes").help} error={issue("notes")}>
+          {(id) => <Textarea id={id} value={form.notes} onChange={(e) => set({ notes: e.target.value })} />}
+        </Field>
+      )}
+
+      <CustomFieldInputs section="rentals" fields={customFields} draft={custom} onChange={setCustom} onBusy={onBusy} issue={issue} />
+      <ErrorNote error={save.error} />
+      <div className="flex justify-end gap-2">
+        <Button type="button" variant="outline" onClick={onDone}>
+          Cancel
+        </Button>
+        <Button type="submit" variant="primary" disabled={save.isPending || uploading || Boolean(chosenBusy) || (reserved && days < 1)}>
+          Save changes
+        </Button>
+      </div>
+    </form>
   );
 }
 
