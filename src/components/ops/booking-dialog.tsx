@@ -75,7 +75,9 @@ export function BookingDialog({ defaults, onClose, onBooked }: { defaults: Booki
     (c) => c.make === form.requestedMake && c.model === form.requestedModel,
   );
   const chosen = showVehiclePicker ? chosenVehicle : chosenClass;
+  const rateOnVehicle = config.modules.vehicles.rateOnVehicle !== false;
   // With the rate or deposit field off (or pricing hidden), bookings take the vehicle's (or class sample).
+  // When rateOnVehicle is off, staff must enter the rate on the booking.
   const rate = canSeeBookingPricing
     ? ((f("dailyRate").on ? numberOrUndefined(form.dailyRate) : undefined) ?? chosen?.dailyRate ?? 0)
     : 0;
@@ -289,7 +291,11 @@ export function BookingDialog({ defaults, onClose, onBooked }: { defaults: Booki
         {canSeeBookingPricing && (f("dailyRate").on || f("depositAmount").on || showSupplierCost) && (
           <div className="grid gap-3 sm:grid-cols-2">
             {f("dailyRate").on && (
-              <Field label={`${f("dailyRate").label} (${config.locale.currency})`} hint={f("dailyRate").help ?? "Defaults to the vehicle's rate"} error={issue("dailyRate")}>
+              <Field
+                label={`${f("dailyRate").label} (${config.locale.currency})`}
+                hint={f("dailyRate").help ?? (rateOnVehicle ? "Defaults to the vehicle's rate" : "Required for this booking")}
+                error={issue("dailyRate")}
+              >
                 {(id) => (
                   <Input
                     id={id}
@@ -297,7 +303,7 @@ export function BookingDialog({ defaults, onClose, onBooked }: { defaults: Booki
                     required={f("dailyRate").required}
                     min="1"
                     step="any"
-                    placeholder={chosen ? String(chosen.dailyRate) : ""}
+                    placeholder={rateOnVehicle && chosen?.dailyRate != null ? String(chosen.dailyRate) : ""}
                     value={form.dailyRate}
                     onChange={(e) => set({ dailyRate: e.target.value })}
                   />

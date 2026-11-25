@@ -103,7 +103,7 @@ export interface TenantConfig {
   };
   modules: {
     dashboard: Toggle;
-    vehicles: Toggle & { serviceIntervalKm: number; thirdPartyVehicles: boolean };
+    vehicles: Toggle & { serviceIntervalKm: number; thirdPartyVehicles: boolean; rateOnVehicle: boolean };
     renters: Toggle;
     rentals: Toggle & {
       inspectionPoints: string[];
@@ -612,10 +612,11 @@ export interface GuestVehicle {
   year: number | null;
   transmission: Transmission;
   fuelType: FuelType;
-  dailyRate: number;
+  /** Omitted when the vehicle has no catalog rate (booking-only pricing). */
+  dailyRate?: number;
   depositAmount: number;
-  /** For the whole stay. */
-  totalAmount: number;
+  /** For the whole stay. Omitted when dailyRate is not set. */
+  totalAmount?: number;
   thumbnail: string | null;
 }
 

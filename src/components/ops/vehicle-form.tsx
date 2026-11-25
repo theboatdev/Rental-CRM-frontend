@@ -156,7 +156,7 @@ export function VehicleForm({ vehicle, onDone }: { vehicle?: Vehicle; onDone: (s
               year: numberOrUndefined(form.year),
               transmission: form.transmission,
               fuelType: form.fuelType,
-              ...(canSeeBookingPricing ? { dailyRate: numberOrUndefined(form.dailyRate) } : {}),
+              ...(canSeeBookingPricing && f("dailyRate").on ? { dailyRate: numberOrUndefined(form.dailyRate) } : {}),
               ...(canSeeBookingPricing && form.depositAmount !== "" ? { depositAmount: numberOrUndefined(form.depositAmount) } : {}),
               ...(form.mileage !== "" ? { mileage: numberOrUndefined(form.mileage) } : {}),
               ...(photo !== undefined ? { thumbnail: photo } : {}),
@@ -227,9 +227,19 @@ export function VehicleForm({ vehicle, onDone }: { vehicle?: Vehicle; onDone: (s
         )}
       </div>
       <div className="grid grid-cols-2 gap-3">
-        {canSeeBookingPricing && (
+        {canSeeBookingPricing && f("dailyRate").on && (
           <Field label={`${f("dailyRate").label} (${currency})`} hint={f("dailyRate").help} error={issue("dailyRate")}>
-            {(id) => <Input id={id} type="number" required min="1" step="any" value={form.dailyRate} onChange={(e) => set({ dailyRate: e.target.value })} />}
+            {(id) => (
+              <Input
+                id={id}
+                type="number"
+                required={f("dailyRate").required}
+                min="1"
+                step="any"
+                value={form.dailyRate}
+                onChange={(e) => set({ dailyRate: e.target.value })}
+              />
+            )}
           </Field>
         )}
         {showSecondary && (

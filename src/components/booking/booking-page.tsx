@@ -121,9 +121,13 @@ function Booking({ profile, slug }: { profile: PortalProfile; slug: string }) {
                     <p className="text-xs text-muted">
                       {TRANSMISSION_LABELS[v.transmission]} · {FUEL_LABELS[v.fuelType]}
                     </p>
-                    <p className="text-sm">
-                      <strong>{format.money(v.totalAmount)}</strong> <span className="text-muted">({format.money(v.dailyRate)} / day)</span>
-                    </p>
+                    {v.dailyRate != null && v.totalAmount != null ? (
+                      <p className="text-sm">
+                        <strong>{format.money(v.totalAmount)}</strong> <span className="text-muted">({format.money(v.dailyRate)} / day)</span>
+                      </p>
+                    ) : (
+                      <p className="text-sm text-muted">Price confirmed at booking</p>
+                    )}
                     <p className="text-xs text-muted">Refundable deposit {format.money(v.depositAmount)}</p>
                   </div>
                 </button>
