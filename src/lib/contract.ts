@@ -404,6 +404,8 @@ export interface Rental {
   endDate: string;
   actualReturnDate: string | null;
   totalDays: number;
+  /** Null = same as totalDays. When set, totalAmount = billableDays × dailyRate. */
+  billableDays: number | null;
   /** Absent when booking pricing is hidden from this caller. */
   dailyRate?: number;
   /** Absent when booking pricing is hidden from this caller. */

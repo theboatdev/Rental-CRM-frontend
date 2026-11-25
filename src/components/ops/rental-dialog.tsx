@@ -82,7 +82,11 @@ function RentalDetails({ rental, onClose }: { rental: RentalDetail; onClose: () 
           {rental.needsVehicleAssignment && <span className="ml-2 text-xs font-semibold text-amber-700">Assign before handover</span>}
         </Item>
         <Item label="Dates">
-          {format.day(rental.startDate)} → {format.day(rental.endDate)} ({rental.totalDays} days)
+          {format.day(rental.startDate)} → {format.day(rental.endDate)} (
+          {canSeeBookingPricing && rental.billableDays != null && rental.billableDays !== rental.totalDays
+            ? `${rental.totalDays} days on road · charging ${rental.billableDays} days`
+            : `${rental.totalDays} days`}
+          )
         </Item>
         {/* Rate/total/deposit show when the caller may see booking pricing (even if those booking fields are off in config). */}
         {canSeeBookingPricing && rental.dailyRate != null && <Item label={f("dailyRate").label}>{format.money(rental.dailyRate)} / day</Item>}
@@ -243,6 +247,7 @@ function EditRentalForm({ rental, onDone }: { rental: RentalDetail; onDone: () =
     endDate: rental.endDate,
     renterId: rental.renter.id,
     dailyRate: rental.dailyRate != null ? String(rental.dailyRate) : "",
+    billableDays: rental.billableDays != null ? String(rental.billableDays) : "",
     depositAmount: rental.depositAmount != null ? String(rental.depositAmount) : "",
     notes: rental.notes ?? "",
   });
@@ -254,9 +259,12 @@ function EditRentalForm({ rental, onDone }: { rental: RentalDetail; onDone: () =
   const set = (patch: Partial<typeof form>) => setForm((current) => ({ ...current, ...patch }));
   const issue = (path: string) => save.error?.issueFor(path);
 
-  const days = form.startDate && form.endDate ? rentalDays(form.startDate, form.endDate) : 0;
+  const calendarDays = form.startDate && form.endDate ? rentalDays(form.startDate, form.endDate) : 0;
+  const billableOverride = numberOrUndefined(form.billableDays);
+  const chargedDays = billableOverride ?? calendarDays;
   const rate = numberOrUndefined(form.dailyRate) ?? rental.dailyRate ?? 0;
-  const previewTotal = Math.max(days, 0) * rate;
+  const previewTotal = Math.max(chargedDays, 0) * rate;
+  const datesChanged = reserved && (form.startDate !== rental.startDate || form.endDate !== rental.endDate);
   const chosenBusy =
     reserved &&
     rental.vehicle &&
@@ -280,6 +288,12 @@ function EditRentalForm({ rental, onDone }: { rental: RentalDetail; onDone: () =
         if (canSeeBookingPricing && f("dailyRate").on) {
           const dailyRate = numberOrUndefined(form.dailyRate);
           if (dailyRate !== undefined && dailyRate !== rental.dailyRate) body.dailyRate = dailyRate;
+        }
+        // Dates change clears billableDays on the server; only send an override when dates stay put.
+        if (canSeeBookingPricing && !datesChanged) {
+          const next = form.billableDays.trim() === "" ? null : numberOrUndefined(form.billableDays) ?? null;
+          const current = rental.billableDays ?? null;
+          if (next !== current) body.billableDays = next;
         }
         if (f("notes").on && form.notes !== (rental.notes ?? "")) body.notes = form.notes;
         const customPayload = customFieldsPayload(customFields, custom, initialCustom);
@@ -318,7 +332,7 @@ function EditRentalForm({ rental, onDone }: { rental: RentalDetail; onDone: () =
               )}
             </Field>
           </div>
-          {days < 1 && <p className="text-sm text-rose-700">The return date must be on or after the pickup date.</p>}
+          {calendarDays < 1 && <p className="text-sm text-rose-700">The return date must be on or after the pickup date.</p>}
           {availability.isFetching && <Loading label="Checking availability" />}
           {chosenBusy && (
             <p className="text-sm text-rose-700">
@@ -387,9 +401,37 @@ function EditRentalForm({ rental, onDone }: { rental: RentalDetail; onDone: () =
         </div>
       )}
 
-      {canSeeBookingPricing && f("dailyRate").on && days > 0 && (
+      {canSeeBookingPricing && (
+        <Field
+          label="Chargeable days"
+          hint={
+            datesChanged
+              ? "Changing the dates resets charging to the full booking length."
+              : `Defaults to the full booking length (${calendarDays || rental.totalDays} days). Leave blank to charge the calendar span.`
+          }
+          error={issue("billableDays")}
+        >
+          {(id) => (
+            <Input
+              id={id}
+              type="number"
+              min="1"
+              step="1"
+              placeholder={String(calendarDays || rental.totalDays)}
+              disabled={datesChanged}
+              value={datesChanged ? "" : form.billableDays}
+              onChange={(e) => set({ billableDays: e.target.value })}
+            />
+          )}
+        </Field>
+      )}
+
+      {canSeeBookingPricing && f("dailyRate").on && chargedDays > 0 && (
         <p className="text-sm text-muted">
-          {days} {days === 1 ? "day" : "days"} × {format.money(rate)} = <strong className="text-ink">{format.money(previewTotal)}</strong>
+          {billableOverride != null && billableOverride !== calendarDays && calendarDays > 0
+            ? `${calendarDays} days on road · charging ${chargedDays} days`
+            : `${chargedDays} ${chargedDays === 1 ? "day" : "days"}`}{" "}
+          × {format.money(rate)} = <strong className="text-ink">{format.money(previewTotal)}</strong>
           {rental.paidAmount > 0 ? ` · paid ${format.money(rental.paidAmount)}` : ""}
         </p>
       )}
@@ -406,7 +448,7 @@ function EditRentalForm({ rental, onDone }: { rental: RentalDetail; onDone: () =
         <Button type="button" variant="outline" onClick={onDone}>
           Cancel
         </Button>
-        <Button type="submit" variant="primary" disabled={save.isPending || uploading || Boolean(chosenBusy) || (reserved && days < 1)}>
+        <Button type="submit" variant="primary" disabled={save.isPending || uploading || Boolean(chosenBusy) || (reserved && calendarDays < 1)}>
           Save changes
         </Button>
       </div>
