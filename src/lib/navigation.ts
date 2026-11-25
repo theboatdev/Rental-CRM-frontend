@@ -9,6 +9,7 @@ export const MODULE_ROUTES: Partial<Record<ModuleKey, { href: string; permission
   calendar: { href: "/calendar", permission: "calendar:view" },
   payments: { href: "/payments", permission: "payments:read" },
   costs: { href: "/costs", permission: "costs:read" },
+  suppliers: { href: "/suppliers", permission: "suppliers:read" },
   whatsappDigest: { href: "/whatsapp", permission: "whatsapp:view" },
 };
 
@@ -26,7 +27,7 @@ export interface Tab {
 export function visibleTabs(config: TenantConfig, can: (permission: string) => boolean): Tab[] {
   const tabs: Tab[] = config.navigation.flatMap(({ module, label }) => {
     const route = MODULE_ROUTES[module];
-    return route && config.modules[module].enabled && can(route.permission) ? [{ key: module, label, href: route.href }] : [];
+    return route && config.modules[module]?.enabled && can(route.permission) ? [{ key: module, label, href: route.href }] : [];
   });
   if (can("team:read") || can("roles:manage")) tabs.push({ key: "team", label: "Team & roles", href: "/team" });
   return tabs;

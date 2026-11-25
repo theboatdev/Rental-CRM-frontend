@@ -9,7 +9,7 @@ import { Field, Input, Select, Textarea } from "@/components/ui/field";
 import { ErrorNote } from "@/components/ui/page";
 import { ApiError } from "@/lib/api";
 import type { GuestVehicles, GuestVoucher, PortalProfile, ResidentType, UploadedFile } from "@/lib/contract";
-import { addDays, daysBetween } from "@/lib/dates";
+import { addDays, rentalDays } from "@/lib/dates";
 import { publicRequest, uploadGuestDocument } from "@/lib/public-api";
 import { DOCUMENT_ACCEPT } from "@/lib/uploads";
 
@@ -62,11 +62,11 @@ function useFormatters(profile: PortalProfile) {
 
 function Booking({ profile, slug }: { profile: PortalProfile; slug: string }) {
   const minDays = Math.max(1, profile.minRentalDays);
-  const [dates, setDates] = useState({ startDate: addDays(profile.today, 1), endDate: addDays(profile.today, 1 + minDays) });
+  const [dates, setDates] = useState({ startDate: addDays(profile.today, 1), endDate: addDays(profile.today, minDays) });
   const [search, setSearch] = useState<{ pending: boolean; data: GuestVehicles | null; error: ApiError | null }>({ pending: false, data: null, error: null });
   const [vehicleId, setVehicleId] = useState<string | null>(null);
   const [voucher, setVoucher] = useState<GuestVoucher | null>(null);
-  const days = daysBetween(dates.startDate, dates.endDate);
+  const days = rentalDays(dates.startDate, dates.endDate);
   const chosen = search.data?.vehicles.find((v) => v.id === vehicleId) ?? null;
   const format = useFormatters(profile);
 
@@ -90,7 +90,7 @@ function Booking({ profile, slug }: { profile: PortalProfile; slug: string }) {
       <Step number={1} title="Your dates" icon={<CalendarDays size={16} />}>
         <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
           <Field label="Pickup">{(id) => <Input id={id} type="date" min={profile.today} value={dates.startDate} onChange={(e) => setDate({ startDate: e.target.value })} />}</Field>
-          <Field label="Return">{(id) => <Input id={id} type="date" min={addDays(dates.startDate, minDays)} value={dates.endDate} onChange={(e) => setDate({ endDate: e.target.value })} />}</Field>
+          <Field label="Return">{(id) => <Input id={id} type="date" min={addDays(dates.startDate, minDays - 1)} value={dates.endDate} onChange={(e) => setDate({ endDate: e.target.value })} />}</Field>
           <Button variant="primary" onClick={find} disabled={search.pending || days < minDays}>
             {search.pending ? "Searching…" : "Show vehicles"}
           </Button>
@@ -121,9 +121,13 @@ function Booking({ profile, slug }: { profile: PortalProfile; slug: string }) {
                     <p className="text-xs text-muted">
                       {TRANSMISSION_LABELS[v.transmission]} · {FUEL_LABELS[v.fuelType]}
                     </p>
-                    <p className="text-sm">
-                      <strong>{format.money(v.totalAmount)}</strong> <span className="text-muted">({format.money(v.dailyRate)} / day)</span>
-                    </p>
+                    {v.dailyRate != null && v.totalAmount != null ? (
+                      <p className="text-sm">
+                        <strong>{format.money(v.totalAmount)}</strong> <span className="text-muted">({format.money(v.dailyRate)} / day)</span>
+                      </p>
+                    ) : (
+                      <p className="text-sm text-muted">Price confirmed at booking</p>
+                    )}
                     <p className="text-xs text-muted">Refundable deposit {format.money(v.depositAmount)}</p>
                   </div>
                 </button>

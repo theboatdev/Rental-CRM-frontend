@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Field, Input, Select, Textarea, numberOrUndefined } from "@/components/ui/field";
 import { ErrorNote } from "@/components/ui/page";
 import type { FuelType, Transmission, UploadedFile, Vehicle, VehicleOwnership } from "@/lib/contract";
-import { useTenantMutation } from "@/lib/queries";
+import { useSuppliers, useTenantMutation } from "@/lib/queries";
 import { DOCUMENT_ACCEPT, PHOTO_ACCEPT, useFileUpload } from "@/lib/uploads";
 import { useWorkspace } from "@/lib/workspace";
 
@@ -91,10 +91,13 @@ function PhotoInput({
 type DocDraft = { type: string; file: UploadedFile | null; expiresAt: string };
 
 export function VehicleForm({ vehicle, onDone }: { vehicle?: Vehicle; onDone: (saved: Vehicle) => void }) {
-  const { config, canSeeBookingPricing } = useWorkspace();
+  const { config, canSeeBookingPricing, moduleOn } = useWorkspace();
   const { currency, secondaryCurrency, distanceUnit } = config.locale;
   const { builtIn: f, custom: customFields } = useFields("vehicles");
   const thirdPartyVehicles = Boolean(config.modules.vehicles.thirdPartyVehicles);
+  const suppliersOn = thirdPartyVehicles && moduleOn("suppliers");
+  const suppliers = useSuppliers(suppliersOn);
+  const activeSuppliers = (suppliers.data ?? []).filter((s) => s.status === "ACTIVE" || s.id === vehicle?.supplierId);
   const [form, setForm] = useState({
     plateNumber: vehicle?.plateNumber ?? "",
     make: vehicle?.make ?? "",
@@ -107,6 +110,7 @@ export function VehicleForm({ vehicle, onDone }: { vehicle?: Vehicle; onDone: (s
     depositAmount: vehicle?.depositAmount != null ? String(vehicle.depositAmount) : "",
     mileage: vehicle ? String(vehicle.mileage) : "",
     ownership: (vehicle?.ownership ?? "OWNED") as VehicleOwnership,
+    supplierId: vehicle?.supplierId ?? "",
     notes: vehicle?.notes ?? "",
   });
   const [savedPhoto, setSavedPhoto] = useState(vehicle?.thumbnail ?? null);
@@ -156,14 +160,21 @@ export function VehicleForm({ vehicle, onDone }: { vehicle?: Vehicle; onDone: (s
               year: numberOrUndefined(form.year),
               transmission: form.transmission,
               fuelType: form.fuelType,
-              ...(canSeeBookingPricing ? { dailyRate: numberOrUndefined(form.dailyRate) } : {}),
+              ...(canSeeBookingPricing && f("dailyRate").on ? { dailyRate: numberOrUndefined(form.dailyRate) } : {}),
               ...(canSeeBookingPricing && form.depositAmount !== "" ? { depositAmount: numberOrUndefined(form.depositAmount) } : {}),
               ...(form.mileage !== "" ? { mileage: numberOrUndefined(form.mileage) } : {}),
               ...(photo !== undefined ? { thumbnail: photo } : {}),
               notes: form.notes,
             }),
             ...(showSecondary ? { secondaryDailyRate: numberOrUndefined(form.secondaryDailyRate) ?? null } : {}),
-            ...(thirdPartyVehicles ? { ownership: form.ownership } : {}),
+            ...(thirdPartyVehicles
+              ? {
+                  ownership: form.ownership,
+                  ...(suppliersOn
+                    ? { supplierId: form.ownership === "THIRD_PARTY" && form.supplierId ? form.supplierId : null }
+                    : {}),
+                }
+              : {}),
             customFields: customFieldsPayload(customFields, custom, vehicle ? initialCustom : undefined),
             ...(documents !== undefined ? { documents } : {}),
           },
@@ -227,9 +238,19 @@ export function VehicleForm({ vehicle, onDone }: { vehicle?: Vehicle; onDone: (s
         )}
       </div>
       <div className="grid grid-cols-2 gap-3">
-        {canSeeBookingPricing && (
+        {canSeeBookingPricing && f("dailyRate").on && (
           <Field label={`${f("dailyRate").label} (${currency})`} hint={f("dailyRate").help} error={issue("dailyRate")}>
-            {(id) => <Input id={id} type="number" required min="1" step="any" value={form.dailyRate} onChange={(e) => set({ dailyRate: e.target.value })} />}
+            {(id) => (
+              <Input
+                id={id}
+                type="number"
+                required={f("dailyRate").required}
+                min="1"
+                step="any"
+                value={form.dailyRate}
+                onChange={(e) => set({ dailyRate: e.target.value })}
+              />
+            )}
           </Field>
         )}
         {showSecondary && (
@@ -255,21 +276,45 @@ export function VehicleForm({ vehicle, onDone }: { vehicle?: Vehicle; onDone: (s
         )}
       </div>
       {thirdPartyVehicles && (
-        <Field
-          label={f("ownership").on ? f("ownership").label : "Ownership"}
-          hint={f("ownership").help}
-          error={issue("ownership")}
-        >
-          {(id) => (
-            <Select id={id} value={form.ownership} onChange={(e) => set({ ownership: e.target.value as VehicleOwnership })}>
-              {Object.entries(OWNERSHIP_LABELS).map(([key, label]) => (
-                <option key={key} value={key}>
-                  {label}
-                </option>
-              ))}
-            </Select>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Field
+            label={f("ownership").on ? f("ownership").label : "Ownership"}
+            hint={f("ownership").help}
+            error={issue("ownership")}
+          >
+            {(id) => (
+              <Select
+                id={id}
+                value={form.ownership}
+                onChange={(e) => {
+                  const ownership = e.target.value as VehicleOwnership;
+                  set({ ownership, ...(ownership === "OWNED" ? { supplierId: "" } : {}) });
+                }}
+              >
+                {Object.entries(OWNERSHIP_LABELS).map(([key, label]) => (
+                  <option key={key} value={key}>
+                    {label}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </Field>
+          {suppliersOn && form.ownership === "THIRD_PARTY" && (
+            <Field label="Supplier" hint="Who supplies this vehicle" error={issue("supplierId")}>
+              {(id) => (
+                <Select id={id} required value={form.supplierId} onChange={(e) => set({ supplierId: e.target.value })}>
+                  <option value="">Select supplier…</option>
+                  {activeSuppliers.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                      {s.status === "INACTIVE" ? " (inactive)" : ""}
+                    </option>
+                  ))}
+                </Select>
+              )}
+            </Field>
           )}
-        </Field>
+        </div>
       )}
       {f("thumbnail").on && (
         <PhotoInput

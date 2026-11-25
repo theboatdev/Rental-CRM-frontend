@@ -16,6 +16,7 @@ export type ModuleKey =
   | "calendar"
   | "payments"
   | "costs"
+  | "suppliers"
   | "fuelLogs"
   | "whatsappDigest"
   | "guestPortal";
@@ -103,7 +104,7 @@ export interface TenantConfig {
   };
   modules: {
     dashboard: Toggle;
-    vehicles: Toggle & { serviceIntervalKm: number; thirdPartyVehicles: boolean };
+    vehicles: Toggle & { serviceIntervalKm: number; thirdPartyVehicles: boolean; rateOnVehicle: boolean };
     renters: Toggle;
     rentals: Toggle & {
       inspectionPoints: string[];
@@ -117,6 +118,7 @@ export interface TenantConfig {
     calendar: Toggle;
     payments: Toggle;
     costs: Toggle & { requireBillUpload: boolean };
+    suppliers: Toggle;
     fuelLogs: Toggle;
     whatsappDigest: Toggle & { cron: string; recipients: string[] };
     guestPortal: Toggle & { residentTypes: ResidentType[]; requireDocumentUpload: boolean };
@@ -133,7 +135,7 @@ export interface TenantConfig {
     defaultDepositAmount: number;
     minRentalDays: number;
     touristPermitDocumentKeys: string[];
-    codePrefixes: { rental: string; booking: string; receipt: string; advance: string; renter: string };
+    codePrefixes: { rental: string; booking: string; receipt: string; advance: string; renter: string; supplier: string };
   };
   /** Every field of each kind of record: settings for the built-in ones, and the tenant's custom fields. */
   fields: Record<FieldSection, { builtIn: Record<string, BuiltInFieldSettings>; custom: CustomField[] }>;
@@ -216,6 +218,8 @@ export interface Vehicle extends VehicleRef {
   mileage: number;
   status: VehicleStatus;
   ownership: VehicleOwnership;
+  /** Linked supplier when ownership is THIRD_PARTY and the suppliers module is on. */
+  supplierId?: string | null;
   thumbnail: string | null;
   notes: string;
   customFields: CustomFieldValues;
@@ -223,6 +227,34 @@ export interface Vehicle extends VehicleRef {
   documents?: VehicleDocument[];
   createdAt: string;
   updatedAt: string;
+}
+
+export type SupplierStatus = "ACTIVE" | "INACTIVE";
+
+/** GET /suppliers list item. */
+export interface Supplier {
+  id: string;
+  profileId: string;
+  name: string;
+  contactPerson: string | null;
+  phone: string;
+  email: string | null;
+  bankName: string | null;
+  bankAccount: string | null;
+  bankAccountHolder: string | null;
+  status: SupplierStatus;
+  notes: string;
+  vehicleCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** GET /suppliers/:id — profile plus linked vehicles and hire history. */
+export interface SupplierDossier extends Supplier {
+  vehicles: Vehicle[];
+  hireHistory: Rental[] | null;
+  /** Sum of supplierRentalCost across hire history, when history is present. */
+  supplierCostsTotal?: number;
 }
 
 export interface VehicleWithStats extends Vehicle {
@@ -372,6 +404,8 @@ export interface Rental {
   endDate: string;
   actualReturnDate: string | null;
   totalDays: number;
+  /** Null = same as totalDays. When set, totalAmount = billableDays × dailyRate. */
+  billableDays: number | null;
   /** Absent when booking pricing is hidden from this caller. */
   dailyRate?: number;
   /** Absent when booking pricing is hidden from this caller. */
@@ -612,10 +646,11 @@ export interface GuestVehicle {
   year: number | null;
   transmission: Transmission;
   fuelType: FuelType;
-  dailyRate: number;
+  /** Omitted when the vehicle has no catalog rate (booking-only pricing). */
+  dailyRate?: number;
   depositAmount: number;
-  /** For the whole stay. */
-  totalAmount: number;
+  /** For the whole stay. Omitted when dailyRate is not set. */
+  totalAmount?: number;
   thumbnail: string | null;
 }
 

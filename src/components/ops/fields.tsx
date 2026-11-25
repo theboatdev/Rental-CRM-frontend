@@ -36,10 +36,19 @@ export interface BuiltInField {
 export function useFields(section: FieldSection) {
   const { config } = useWorkspace();
   const fields = config.fields[section];
+  const rateOnVehicle = config.modules.vehicles.rateOnVehicle !== false;
   const builtIn = (key: string): BuiltInField => {
     const settings = fields.builtIn[key];
     // Keys that aren't built-in fields, such as a request's vehicleId, count as on.
     if (!settings) return { on: true, label: key, required: false, help: undefined, listed: false };
+    // Catalog rates live on the vehicle only when modules.vehicles.rateOnVehicle is on.
+    if (section === "vehicles" && (key === "dailyRate" || key === "secondaryDailyRate") && !rateOnVehicle) {
+      return { on: false, label: settings.label, required: false, help: settings.helpText || undefined, listed: false };
+    }
+    // Booking-only mode: rental daily rate can't be turned off.
+    if (section === "rentals" && key === "dailyRate" && !rateOnVehicle) {
+      return { on: true, label: settings.label, required: true, help: settings.helpText || undefined, listed: settings.showInList };
+    }
     return { on: settings.active, label: settings.label, required: settings.required, help: settings.helpText || undefined, listed: settings.active && settings.showInList };
   };
   return { builtIn, custom: fields.custom.filter((field) => field.active) };

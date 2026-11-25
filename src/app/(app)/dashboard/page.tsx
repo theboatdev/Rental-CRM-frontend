@@ -241,7 +241,7 @@ function Alerts({ alerts }: { alerts: DashboardAlert[] }) {
   if (alerts.length === 0) return <EmptyState>Nothing needs attention right now.</EmptyState>;
   return (
     <ul className="divide-y divide-line">
-      {alerts.map((alert) => {
+      {alerts.map((alert, index) => {
         const href = alertHref(alert);
         const content = (
           <>
@@ -252,8 +252,10 @@ function Alerts({ alerts }: { alerts: DashboardAlert[] }) {
             </span>
           </>
         );
+        // kind+title alone collides when one vehicle has several document_expiry alerts.
+        const key = [alert.kind, alert.vehicleId ?? alert.rentalId ?? alert.renterId, alert.detail, index].join(":");
         return (
-          <li key={`${alert.kind}:${alert.title}`}>
+          <li key={key}>
             {href ? (
               <Link href={href} className="flex gap-3 px-5 py-4 text-sm hover:bg-paper">
                 {content}
