@@ -23,6 +23,8 @@ import type {
   Renter,
   RenterDossier,
   Role,
+  Supplier,
+  SupplierDossier,
   VehicleDossier,
   VehicleWithStats,
   WhatsAppDigest,
@@ -66,6 +68,8 @@ export const useAvailability = (startDate: string, endDate: string, excludeRenta
   );
 export const useRenters = () => useTenantQuery<Renter[]>(["renters"], "/renters");
 export const useRenter = (id: string | null) => useTenantQuery<RenterDossier>(["renters", id], id && `/renters/${id}`);
+export const useSuppliers = (enabled = true) => useTenantQuery<Supplier[]>(["suppliers"], enabled ? "/suppliers" : null);
+export const useSupplier = (id: string | null) => useTenantQuery<SupplierDossier>(["suppliers", id], id && `/suppliers/${id}`);
 export const useRentals = (status?: RentalStatus | "open") => useTenantQuery<Rental[]>(["rentals", status ?? "all"], `/rentals${query({ status })}`);
 export const useRental = (id: string | null) => useTenantQuery<RentalDetail>(["rentals", "detail", id], id && `/rentals/${id}`);
 export const useCalendar = (month: string) => useTenantQuery<CalendarMonth>(["calendar", month], `/calendar${query({ month })}`);
@@ -80,7 +84,7 @@ export const usePermissionCatalog = () => useTenantQuery<PermissionInfo[]>(["per
 export const useAudit = (enabled = true) => useTenantQuery<AuditEntry[]>(["audit"], enabled ? "/audit?limit=200" : null);
 
 /** Everything an operations change can affect: they're cheap to refetch, so a change refreshes them all. */
-const OPERATIONS = ["vehicles", "availability", "renters", "rentals", "calendar", "payments", "costs", "fuel", "dashboard", "digest", "audit"];
+const OPERATIONS = ["vehicles", "availability", "renters", "suppliers", "rentals", "calendar", "payments", "costs", "fuel", "dashboard", "digest", "audit"];
 const TEAM = ["members", "invitations", "roles", "audit", "me"];
 
 /**

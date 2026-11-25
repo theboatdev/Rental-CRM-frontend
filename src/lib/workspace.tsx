@@ -48,7 +48,7 @@ export function WorkspaceProvider({ me, config, children }: { me: Me; config: Co
       config: tenantConfig,
       configVersion: config.version,
       can,
-      moduleOn: (module) => tenantConfig.modules[module].enabled,
+      moduleOn: (module) => Boolean(tenantConfig.modules[module]?.enabled),
       canSeeBookingPricing: !hideBookingPricing || can("financials:view"),
       format: createFormatters(tenantConfig),
       label: (list, key) => (tenantConfig.lists[list] ?? []).find((item) => item.key === key)?.label ?? key,

@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, ArrowUpRight, Car, Fuel, Plus, Users, Wrench } from "lucide-react";
+import { AlertTriangle, ArrowUpRight, Building2, Car, Fuel, Plus, Users, Wrench } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState, type ReactNode } from "react";
 import { useListColumns } from "@/components/ops/fields";
@@ -80,6 +80,7 @@ function VehicleCard({ vehicle, onOpen }: { vehicle: VehicleWithStats; onOpen: (
   const { listed, columns } = useListColumns<VehicleWithStats>("vehicles", NATIVE_FIELDS);
   const { stats } = vehicle;
   const docAlert = vehicleDocumentAlert(vehicle.documents, config, today());
+  const isThirdParty = Boolean(config.modules.vehicles.thirdPartyVehicles) && vehicle.ownership === "THIRD_PARTY";
   const secondary =
     canSeeBookingPricing && listed("secondaryDailyRate") && vehicle.secondaryDailyRate != null
       ? format.secondaryMoney(vehicle.secondaryDailyRate)
@@ -118,6 +119,15 @@ function VehicleCard({ vehicle, onOpen }: { vehicle: VehicleWithStats; onOpen: (
             )}
             <VehicleStatusBadge status={vehicle.status} />
           </div>
+          {isThirdParty && (
+            <span
+              title="Third-party supplier vehicle"
+              className="absolute bottom-2 left-3 inline-flex items-center gap-1 rounded bg-amber-500 px-2 py-1 text-xs font-semibold text-white shadow-sm"
+            >
+              <Building2 size={12} aria-hidden />
+              Third-party
+            </span>
+          )}
           {specs.length > 0 && <span className="absolute right-3 bottom-2 bg-black/75 px-1.5 py-0.5 font-sans text-xs text-white/90">{specs.join(" · ")}</span>}
         </div>
         <div className="space-y-3 p-5">
